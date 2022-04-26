@@ -105,7 +105,7 @@ func TestNewURLShortenerHandlerPost(t *testing.T) {
 			reader := strings.NewReader(tt.body)
 			request := httptest.NewRequest(http.MethodPost, "/", reader)
 			w := httptest.NewRecorder()
-			h := NewURLShortenerHandler(RepoMock{})
+			h := NewURLShortenerHandler("http://localhost:8080/", RepoMock{})
 			h.ServeHTTP(w, request)
 			result := w.Result()
 
@@ -157,10 +157,10 @@ func TestNewURLShortenerHandlerGet(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			request := httptest.NewRequest(http.MethodGet, tt.link, nil)
 			w := httptest.NewRecorder()
-			h := NewURLShortenerHandler(tt.args.repo)
+			h := NewURLShortenerHandler("http://localhost:8080/", tt.args.repo)
 			h.ServeHTTP(w, request)
 			result := w.Result()
-			defer result.Body.Close()
+			result.Body.Close()
 
 			require.Equal(t, tt.want.status, result.StatusCode)
 			assert.Equal(t, tt.want.location, result.Header.Get("Location"))
@@ -173,7 +173,6 @@ type RepoMock struct {
 }
 
 func (rm RepoMock) Store(link string) (id string, err error) {
-	// не используется для тестов - go vet ругается
 	// rm.singleItemStorage = link
 	return "1111", nil
 }

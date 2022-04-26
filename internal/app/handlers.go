@@ -13,19 +13,30 @@ type URLShortenerHandler struct {
 	//non-persistent storage
 	//just for starting
 	linkRepo Repository
+	baseURL  string
 }
 
 // NewURLShortenerHandler создает URLShortenerHandler и инициализирует его
-func NewURLShortenerHandler(repo Repository) *URLShortenerHandler {
+func NewURLShortenerHandler(base string, repo Repository) *URLShortenerHandler {
 	h := URLShortenerHandler{}
 	h.linkRepo = repo
+	if IsURL(base) {
+		h.baseURL = base
+	} else {
+		h.baseURL = "http://localhost:8080/"
+	}
 	return &h
 }
 
+func (s URLShortenerHandler) PostHandler() func(w http.ResponseWriter, r *http.Request) {
+	return s.handlePost
+}
+
+func (s URLShortenerHandler) GetHandler() func(w http.ResponseWriter, r *http.Request) {
+	return s.handleGet
+}
+
 // ServeHTTP - реализация метода интефрейса http.Handler
-// Эндпоинт POST / принимает в теле запроса строку URL для сокращения и возвращает ответ с кодом 201 и сокращённым URL в виде текстовой строки в теле.
-// Эндпоинт GET /{id} принимает в качестве URL-параметра идентификатор сокращённого URL и возвращает ответ с кодом 307 и оригинальным URL в HTTP-заголовке Location.
-// Нужно учесть некорректные запросы и возвращать для них ответ с кодом 400.
 func (s URLShortenerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
@@ -33,8 +44,7 @@ func (s URLShortenerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		s.handlePost(w, r)
 	default:
-		http.Error(w, "Only GET and POST requests are allowed!", http.StatusMethodNotAllowed)
-		return
+		s.handleMethodNotAllowed(w, r)
 	}
 }
 
@@ -52,7 +62,7 @@ func (s URLShortenerHandler) handlePost(w http.ResponseWriter, r *http.Request) 
 
 	link := string(b)
 	if !IsURL(link) {
-		http.Error(w, "Hey, Dude! Provide a link! Not a crap!", http.StatusBadRequest)
+		http.Error(w, "Hey, Dude! Provide a link! Not the crap!", http.StatusBadRequest)
 		return
 	}
 	shortenedURL, err := s.createShortLink(link)
@@ -70,7 +80,6 @@ func (s URLShortenerHandler) handlePost(w http.ResponseWriter, r *http.Request) 
 }
 
 // createShortLink - создает короткую ссылку в ответ на исходную
-// Ссылка не очень короткая :) Простейшая реализация через UUID.
 func (s URLShortenerHandler) createShortLink(originalLink string) (string, error) {
 	id, err := s.linkRepo.Store(originalLink)
 	if err != nil {
@@ -78,7 +87,7 @@ func (s URLShortenerHandler) createShortLink(originalLink string) (string, error
 	}
 
 	var sb strings.Builder
-	sb.WriteString("http://localhost:8080/")
+	sb.WriteString(s.baseURL)
 	sb.WriteString(id)
 	shortenedURL := sb.String()
 	return shortenedURL, nil
@@ -86,6 +95,15 @@ func (s URLShortenerHandler) createShortLink(originalLink string) (string, error
 
 // handlePost - ручка для для открытия по короткой ссылке
 func (s URLShortenerHandler) handleGet(w http.ResponseWriter, r *http.Request) {
+	// Не стал переписывать на получение ID через chi.URLParam
+	// потому что в этом случае тесты надо тоже завязать на chi,
+	// так как паттерн пути задается при создании сервера,
+	// а обрабатывается в handlers.
+	// То есть в тесте должен быть задан тот же паттерн через chi,
+	// чтобы он смог его подхватить тут.
+	// Можно тестировать сервер целиком, но не тестирвовать handlers,
+	// тогда не будет этой коллизии.
+	// ToDo - Если можно обойти - то как? Буду раз узнать!
 	id := r.URL.Path[1:]
 	u, err := s.linkRepo.Restore(id)
 	if err != nil {
@@ -101,4 +119,14 @@ func (s URLShortenerHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 func IsURL(str string) bool {
 	u, err := url.Parse(str)
 	return err == nil && u.Scheme != "" && u.Host != ""
+}
+
+// handleMethodNotAllowed обрабатывает не валидный HTTP метод
+func (s URLShortenerHandler) handleMethodNotAllowed(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, "Only GET and POST requests are allowed!", http.StatusMethodNotAllowed)
+}
+
+// handleNotFound обрабатывает не найденный путь
+func (s URLShortenerHandler) handleNotFound(w http.ResponseWriter, r *http.Request) {
+	http.Error(w, `Only POST "/" with link in body and GET "/{short_link_id} are allowed" `, http.StatusNotFound)
 }
