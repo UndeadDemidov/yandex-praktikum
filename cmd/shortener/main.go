@@ -1,11 +1,11 @@
 package main
 
-import "net/http"
+import (
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app"
+	"log"
+)
 
 func main() {
-	hand := NewURLShortenerHandler()
-	// маршрутизация запросов обработчику
-	http.Handle("/", hand)
-	// запуск сервера с адресом localhost, порт 8080
-	_ = http.ListenAndServe(":8080", nil)
+	s := app.NewServer(":8080")
+	log.Fatalln(s.ListenAndServe())
 }
