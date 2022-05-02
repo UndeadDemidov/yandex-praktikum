@@ -1,10 +1,9 @@
 package app
 
 import (
+	"fmt"
 	"io"
 	"net/http"
-	"net/url"
-	"strings"
 )
 
 // URLShortenerHandler - реализация интерфейса http.Handler
@@ -14,6 +13,14 @@ type URLShortenerHandler struct {
 	//just for starting
 	linkRepo Repository
 	baseURL  string
+}
+
+// Repository описывает контракт работы с хранилищем.
+// Используется для удобства тестирования и для дальнейшей легкой мигарции на другой "движок".
+type Repository interface {
+	IsExist(id string) bool
+	Store(id string, link string) (err error)
+	Restore(id string) (link string, err error)
 }
 
 // NewURLShortenerHandler создает URLShortenerHandler и инициализирует его
@@ -28,49 +35,49 @@ func NewURLShortenerHandler(base string, repo Repository) *URLShortenerHandler {
 	return &h
 }
 
-func (s URLShortenerHandler) PostHandler() func(w http.ResponseWriter, r *http.Request) {
-	return s.handlePost
-}
-
-func (s URLShortenerHandler) GetHandler() func(w http.ResponseWriter, r *http.Request) {
-	return s.handleGet
-}
-
 // ServeHTTP - реализация метода интефрейса http.Handler
 func (s URLShortenerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		s.handleGet(w, r)
+		s.HandleGet(w, r)
 	case http.MethodPost:
-		s.handlePost(w, r)
+		s.HandlePost(w, r)
 	default:
-		s.handleMethodNotAllowed(w, r)
+		s.HandleMethodNotAllowed(w, r)
 	}
 }
 
-// handlePost - ручка для создания короткой ссылки
-func (s URLShortenerHandler) handlePost(w http.ResponseWriter, r *http.Request) {
+// HandlePost - ручка для создания короткой ссылки
+// Оригинальная ссылка передается через Text Body
+func (s URLShortenerHandler) HandlePost(w http.ResponseWriter, r *http.Request) {
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "Something went wrong due reading body request", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	// validate
 	if len(b) == 0 {
 		http.Error(w, "The link is not provided", http.StatusBadRequest)
 		return
 	}
-
 	link := string(b)
 	if !IsURL(link) {
 		http.Error(w, "Hey, Dude! Provide a link! Not the crap!", http.StatusBadRequest)
 		return
 	}
-	shortenedURL, err := s.createShortLink(link)
+
+	id, err := CreateShortID(s.linkRepo.IsExist)
 	if err != nil {
-		http.Error(w, "Couldn't store link", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = s.linkRepo.Store(id, link)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
+	shortenedURL := fmt.Sprintf("%s%s", s.baseURL, id)
 	w.WriteHeader(http.StatusCreated)
 	_, err = w.Write([]byte(shortenedURL))
 	if err != nil {
@@ -79,22 +86,47 @@ func (s URLShortenerHandler) handlePost(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-// createShortLink - создает короткую ссылку в ответ на исходную
-func (s URLShortenerHandler) createShortLink(originalLink string) (string, error) {
-	id, err := s.linkRepo.Store(originalLink)
+// HandlePostShorten - ручка для создания короткой ссылки
+// Оригинальная ссылка передается через JSON Body
+func (s URLShortenerHandler) HandlePostShorten(w http.ResponseWriter, r *http.Request) {
+	b, err := io.ReadAll(r.Body)
 	if err != nil {
-		return "", err
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	// validate
+	if len(b) == 0 {
+		http.Error(w, "The link is not provided", http.StatusBadRequest)
+		return
+	}
+	link := string(b)
+	if !IsURL(link) {
+		http.Error(w, "Hey, Dude! Provide a link! Not the crap!", http.StatusBadRequest)
+		return
 	}
 
-	var sb strings.Builder
-	sb.WriteString(s.baseURL)
-	sb.WriteString(id)
-	shortenedURL := sb.String()
-	return shortenedURL, nil
+	id, err := CreateShortID(s.linkRepo.IsExist)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	err = s.linkRepo.Store(id, link)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	shortenedURL := fmt.Sprintf("%s%s", s.baseURL, id)
+	w.WriteHeader(http.StatusCreated)
+	_, err = w.Write([]byte(shortenedURL))
+	if err != nil {
+		http.Error(w, "Something went wrong due writing response", http.StatusInternalServerError)
+		return
+	}
 }
 
-// handlePost - ручка для для открытия по короткой ссылке
-func (s URLShortenerHandler) handleGet(w http.ResponseWriter, r *http.Request) {
+// HandleGet - ручка для для открытия по короткой ссылке
+func (s URLShortenerHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
 	// Не стал переписывать на получение ID через chi.URLParam
 	// потому что в этом случае тесты надо тоже завязать на chi,
 	// так как паттерн пути задается при создании сервера,
@@ -104,6 +136,7 @@ func (s URLShortenerHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 	// Можно тестировать сервер целиком, но не тестирвовать handlers,
 	// тогда не будет этой коллизии.
 	// ToDo - Если можно обойти - то как? Буду раз узнать!
+	// https://github.com/go-chi/chi/issues/76#issuecomment-370145140
 	id := r.URL.Path[1:]
 	u, err := s.linkRepo.Restore(id)
 	if err != nil {
@@ -114,19 +147,12 @@ func (s URLShortenerHandler) handleGet(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
-// IsURL проверяет ссылку на валидность.
-// Хотел сначала на регулярках сделать, потом со стековерфлоу согрешил
-func IsURL(str string) bool {
-	u, err := url.Parse(str)
-	return err == nil && u.Scheme != "" && u.Host != ""
-}
-
-// handleMethodNotAllowed обрабатывает не валидный HTTP метод
-func (s URLShortenerHandler) handleMethodNotAllowed(w http.ResponseWriter, r *http.Request) {
+// HandleMethodNotAllowed обрабатывает не валидный HTTP метод
+func (s URLShortenerHandler) HandleMethodNotAllowed(w http.ResponseWriter, _ *http.Request) {
 	http.Error(w, "Only GET and POST requests are allowed!", http.StatusMethodNotAllowed)
 }
 
-// handleNotFound обрабатывает не найденный путь
-func (s URLShortenerHandler) handleNotFound(w http.ResponseWriter, r *http.Request) {
+// HandleNotFound обрабатывает не найденный путь
+func (s URLShortenerHandler) HandleNotFound(w http.ResponseWriter, _ *http.Request) {
 	http.Error(w, `Only POST "/" with link in body and GET "/{short_link_id} are allowed" `, http.StatusNotFound)
 }

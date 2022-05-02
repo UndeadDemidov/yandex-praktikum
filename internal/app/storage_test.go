@@ -62,6 +62,7 @@ func TestLinkStorage_Store(t *testing.T) {
 		storage map[string]string
 	}
 	type args struct {
+		id   string
 		link string
 	}
 	tests := []struct {
@@ -76,7 +77,7 @@ func TestLinkStorage_Store(t *testing.T) {
 				"1111": "https://ya.ru",
 				"2222": "https://yandex.ru",
 			}},
-			args:    args{"https://practicum.yandex.ru/"},
+			args:    args{"3333", "https://practicum.yandex.ru/"},
 			wantErr: assert.NoError,
 		},
 		{
@@ -86,8 +87,17 @@ func TestLinkStorage_Store(t *testing.T) {
 				"1111": "https://ya.ru",
 				"2222": "https://yandex.ru",
 			}},
-			args:    args{"https://yandex.ru"},
+			args:    args{"3333", "https://yandex.ru"},
 			wantErr: assert.NoError,
+		},
+		{
+			name: "store with same id",
+			fields: fields{storage: map[string]string{
+				"1111": "https://ya.ru",
+				"2222": "https://yandex.ru",
+			}},
+			args:    args{"2222", "https://practicum.yandex.ru/"},
+			wantErr: assert.Error,
 		},
 	}
 	for _, tt := range tests {
@@ -95,11 +105,10 @@ func TestLinkStorage_Store(t *testing.T) {
 			ls := LinkStorage{
 				storage: tt.fields.storage,
 			}
-			gotID, err := ls.Store(tt.args.link)
+			err := ls.Store(tt.args.id, tt.args.link)
 			if !tt.wantErr(t, err, fmt.Sprintf("Store(%v)", tt.args.link)) {
 				return
 			}
-			assert.NotEmptyf(t, gotID, "Store(%v)", tt.args.link)
 		})
 	}
 }
