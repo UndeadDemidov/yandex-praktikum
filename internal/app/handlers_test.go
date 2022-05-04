@@ -121,6 +121,7 @@ func TestURLShortenerHandler_HandlePostShorten(t *testing.T) {
 			h := NewURLShortenerHandler("http://localhost:8080/", RepoMock{})
 			h.HandlePostShorten(w, request)
 			result := w.Result()
+			defer result.Body.Close()
 
 			require.Equal(t, tt.want.status, result.StatusCode)
 			var resp URLShortenResponse
