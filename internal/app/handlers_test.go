@@ -1,6 +1,10 @@
 package app
 
 import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"io/ioutil"
@@ -10,7 +14,7 @@ import (
 	"testing"
 )
 
-func TestNewURLShortenerHandlerPost(t *testing.T) {
+func TestURLShortenerHandler_HandlePost(t *testing.T) {
 	type want struct {
 		status int
 		isURL  bool
@@ -51,7 +55,7 @@ func TestNewURLShortenerHandlerPost(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, "/", reader)
 			w := httptest.NewRecorder()
 			h := NewURLShortenerHandler("http://localhost:8080/", RepoMock{})
-			h.ServeHTTP(w, request)
+			h.HandlePost(w, request)
 			result := w.Result()
 
 			urlResult, err := ioutil.ReadAll(result.Body)
@@ -65,7 +69,70 @@ func TestNewURLShortenerHandlerPost(t *testing.T) {
 	}
 }
 
-func TestNewURLShortenerHandlerGet(t *testing.T) {
+func TestURLShortenerHandler_HandlePostShorten(t *testing.T) {
+	type want struct {
+		status  int
+		wantErr assert.ErrorAssertionFunc
+	}
+	tests := []struct {
+		name     string
+		reqBody  string
+		respBody string
+		want     want
+	}{
+		{
+			name:    "valid request",
+			reqBody: `{"url":"https://habr.com/ru/post/66931/"}`,
+			want: want{
+				status:  http.StatusCreated,
+				wantErr: assert.NoError,
+			},
+		},
+		{
+			name:    "invalid link",
+			reqBody: `{"url":"yaru"}`,
+			want: want{
+				status:  http.StatusBadRequest,
+				wantErr: assert.Error,
+			},
+		},
+		{
+			name:    "invalid json",
+			reqBody: `{"url":"yaru"`,
+			want: want{
+				status:  http.StatusBadRequest,
+				wantErr: assert.Error,
+			},
+		},
+		{
+			name:    "empty body",
+			reqBody: "",
+			want: want{
+				status:  http.StatusBadRequest,
+				wantErr: assert.Error,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reader := strings.NewReader(tt.reqBody)
+			request := httptest.NewRequest(http.MethodPost, "/", reader)
+			w := httptest.NewRecorder()
+			h := NewURLShortenerHandler("http://localhost:8080/", RepoMock{})
+			h.HandlePostShorten(w, request)
+			result := w.Result()
+
+			require.Equal(t, tt.want.status, result.StatusCode)
+			var resp URLShortenResponse
+			err := json.NewDecoder(result.Body).Decode(&resp)
+			if !tt.want.wantErr(t, err, fmt.Sprintf("request: (%v)", tt.reqBody)) {
+				return
+			}
+		})
+	}
+}
+
+func TestURLShortenerHandler_HandleGet(t *testing.T) {
 	type args struct {
 		repo RepoMock
 	}
@@ -74,24 +141,27 @@ func TestNewURLShortenerHandlerGet(t *testing.T) {
 		location string
 	}
 	tests := []struct {
-		name string
-		link string
-		args args
-		want want
+		name  string
+		link  string
+		param string
+		args  args
+		want  want
 	}{
 		{
-			name: "valid link",
-			link: "http://localhost:8080/1111",
-			args: args{RepoMock{singleItemStorage: "https://ya.ru"}},
+			name:  "valid link",
+			link:  "http://localhost:8080",
+			param: "1111",
+			args:  args{RepoMock{singleItemStorage: "https://ya.ru"}},
 			want: want{
 				status:   http.StatusTemporaryRedirect,
 				location: "https://ya.ru",
 			},
 		},
 		{
-			name: "invalid link",
-			link: "http://localhost:8080/2222",
-			args: args{RepoMock{singleItemStorage: "https://ya.ru"}},
+			name:  "invalid link",
+			link:  "http://localhost:8080",
+			param: "2222",
+			args:  args{RepoMock{singleItemStorage: "https://ya.ru"}},
 			want: want{
 				status:   http.StatusBadRequest,
 				location: "",
@@ -100,10 +170,14 @@ func TestNewURLShortenerHandlerGet(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			request := httptest.NewRequest(http.MethodGet, tt.link, nil)
-			w := httptest.NewRecorder()
+			r := httptest.NewRequest(http.MethodGet, tt.link, nil)
+			rctx := chi.NewRouteContext()
+			rctx.URLParams.Add("id", tt.param)
+			r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
+
 			h := NewURLShortenerHandler("http://localhost:8080/", tt.args.repo)
-			h.ServeHTTP(w, request)
+			w := httptest.NewRecorder()
+			h.HandleGet(w, r)
 			result := w.Result()
 			_ = result.Body.Close()
 

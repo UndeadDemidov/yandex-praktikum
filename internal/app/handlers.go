@@ -1,7 +1,9 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
+	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
 )
@@ -66,22 +68,15 @@ func (s URLShortenerHandler) HandlePost(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	id, err := CreateShortID(s.linkRepo.IsExist)
+	shortenedURL, err := s.shorten(link)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	err = s.linkRepo.Store(id, link)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	shortenedURL := fmt.Sprintf("%s%s", s.baseURL, id)
 	w.WriteHeader(http.StatusCreated)
 	_, err = w.Write([]byte(shortenedURL))
 	if err != nil {
-		http.Error(w, "Something went wrong due writing response", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
@@ -89,55 +84,49 @@ func (s URLShortenerHandler) HandlePost(w http.ResponseWriter, r *http.Request) 
 // HandlePostShorten - ручка для создания короткой ссылки
 // Оригинальная ссылка передается через JSON Body
 func (s URLShortenerHandler) HandlePostShorten(w http.ResponseWriter, r *http.Request) {
-	b, err := io.ReadAll(r.Body)
+	req := URLShortenRequest{}
+	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "JSON {\"url\":\"<some_url>\"} is expected", http.StatusBadRequest)
 		return
 	}
-	// validate
-	if len(b) == 0 {
-		http.Error(w, "The link is not provided", http.StatusBadRequest)
-		return
-	}
-	link := string(b)
-	if !IsURL(link) {
+	if !IsURL(req.URL) {
 		http.Error(w, "Hey, Dude! Provide a link! Not the crap!", http.StatusBadRequest)
 		return
 	}
 
-	id, err := CreateShortID(s.linkRepo.IsExist)
+	shortenedURL, err := s.shorten(req.URL)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	err = s.linkRepo.Store(id, link)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	shortenedURL := fmt.Sprintf("%s%s", s.baseURL, id)
+	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	_, err = w.Write([]byte(shortenedURL))
+	resp := URLShortenResponse{Result: shortenedURL}
+	err = json.NewEncoder(w).Encode(&resp)
 	if err != nil {
-		http.Error(w, "Something went wrong due writing response", http.StatusInternalServerError)
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
 
+// shorten - возвращает короткую ссылку в ответ на оригинальную
+func (s URLShortenerHandler) shorten(originalURL string) (shortenedURL string, err error) {
+	id, err := CreateShortID(s.linkRepo.IsExist)
+	if err != nil {
+		return "", err
+	}
+	err = s.linkRepo.Store(id, originalURL)
+	if err != nil {
+		return "", err
+	}
+	shortenedURL = fmt.Sprintf("%s%s", s.baseURL, id)
+	return shortenedURL, nil
+}
+
 // HandleGet - ручка для для открытия по короткой ссылке
 func (s URLShortenerHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
-	// Не стал переписывать на получение ID через chi.URLParam
-	// потому что в этом случае тесты надо тоже завязать на chi,
-	// так как паттерн пути задается при создании сервера,
-	// а обрабатывается в handlers.
-	// То есть в тесте должен быть задан тот же паттерн через chi,
-	// чтобы он смог его подхватить тут.
-	// Можно тестировать сервер целиком, но не тестирвовать handlers,
-	// тогда не будет этой коллизии.
-	// ToDo - Если можно обойти - то как? Буду раз узнать!
-	// https://github.com/go-chi/chi/issues/76#issuecomment-370145140
-	id := r.URL.Path[1:]
+	id := chi.URLParam(r, "id")
 	u, err := s.linkRepo.Restore(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
