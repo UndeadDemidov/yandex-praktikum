@@ -6,6 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
+	"strings"
 )
 
 // URLShortenerHandler - реализация интерфейса http.Handler
@@ -30,7 +31,7 @@ func NewURLShortenerHandler(base string, repo Repository) *URLShortenerHandler {
 	h := URLShortenerHandler{}
 	h.linkRepo = repo
 	if IsURL(base) {
-		h.baseURL = base
+		h.baseURL = fmt.Sprintf("%s/", strings.TrimRight(base, "/"))
 	} else {
 		h.baseURL = "http://localhost:8080/"
 	}
