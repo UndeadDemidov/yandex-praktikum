@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
-	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -125,12 +124,6 @@ func TestURLShortenerHandler_HandlePostShorten(t *testing.T) {
 			h := NewURLShortenerHandler("http://localhost:8080/", RepoMock{})
 			h.HandlePostShorten(w, request)
 			result := w.Result()
-			defer func() {
-				err := result.Body.Close()
-				if err != nil {
-					log.Fatalln(err)
-				}
-			}()
 
 			require.Equal(t, tt.want.status, result.StatusCode)
 			var resp URLShortenResponse
@@ -138,6 +131,9 @@ func TestURLShortenerHandler_HandlePostShorten(t *testing.T) {
 			if !tt.want.wantErr(t, err, fmt.Sprintf("request: (%v)", tt.reqBody)) {
 				return
 			}
+
+			err = result.Body.Close()
+			require.NoError(t, err)
 		})
 	}
 }
@@ -189,7 +185,8 @@ func TestURLShortenerHandler_HandleGet(t *testing.T) {
 			w := httptest.NewRecorder()
 			h.HandleGet(w, r)
 			result := w.Result()
-			_ = result.Body.Close()
+			err := result.Body.Close()
+			require.NoError(t, err)
 
 			require.Equal(t, tt.want.status, result.StatusCode)
 			assert.Equal(t, tt.want.location, result.Header.Get("Location"))
