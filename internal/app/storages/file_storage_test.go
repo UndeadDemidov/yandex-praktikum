@@ -2,6 +2,7 @@ package storages
 
 import (
 	"fmt"
+	"log"
 	"os"
 	"testing"
 
@@ -39,9 +40,19 @@ func TestFileStorage_Store(t *testing.T) {
 
 	filename := "test_storage.txt"
 	fs, err := NewFileStorage(filename)
-	defer os.Remove(filename)
-	defer fs.Close()
 	require.NoError(t, err)
+	defer func(name string) {
+		err := os.Remove(name)
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}(filename)
+	defer func(fs *FileStorage) {
+		err := fs.Close()
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}(fs)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -78,8 +89,13 @@ func TestFileStorage_IsExist(t *testing.T) {
 
 	filename := "file_storage.tst"
 	fs, err := NewFileStorage(filename)
-	defer fs.Close()
 	require.NoError(t, err)
+	defer func(fs *FileStorage) {
+		err := fs.Close()
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}(fs)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -120,8 +136,13 @@ func TestFileStorage_Restore(t *testing.T) {
 
 	filename := "file_storage.tst"
 	fs, err := NewFileStorage(filename)
-	defer fs.Close()
 	require.NoError(t, err)
+	defer func(fs *FileStorage) {
+		err := fs.Close()
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}(fs)
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

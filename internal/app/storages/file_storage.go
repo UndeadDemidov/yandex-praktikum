@@ -27,7 +27,7 @@ type FileStorage struct {
 
 var _ handlers.Repository = (*FileStorage)(nil)
 
-// NewFileStorage cоздает и возвращает экземпляр FileStorage
+// NewFileStorage cоздаёт и возвращает экземпляр FileStorage
 func NewFileStorage(filename string) (fs *FileStorage, err error) {
 	if err = utils.CheckFilename(filename); err != nil {
 		return nil, err
@@ -59,7 +59,7 @@ func (f *FileStorage) IsExist(id string) bool {
 	for scanner.Scan() {
 		if strings.Contains(scanner.Text(), id) {
 			// Не обрабатывается ситуация, когда в одной из ссылок может быть подстрока равная ID
-			// Для этого можно сделать decoding JSON или захаркодить `"Key:"id"`
+			// Для этого можно сделать decoding JSON или захардкодить `"Key:"id"`
 			return true
 		}
 	}

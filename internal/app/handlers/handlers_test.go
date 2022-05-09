@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -124,7 +126,12 @@ func TestURLShortenerHandler_HandlePostShorten(t *testing.T) {
 			h := NewURLShortenerHandler("http://localhost:8080/", RepoMock{})
 			h.HandlePostShorten(w, request)
 			result := w.Result()
-			defer result.Body.Close()
+			defer func(Body io.ReadCloser) {
+				err := Body.Close()
+				if err != nil {
+					log.Fatalln(err)
+				}
+			}(result.Body)
 
 			require.Equal(t, tt.want.status, result.StatusCode)
 			var resp URLShortenResponse

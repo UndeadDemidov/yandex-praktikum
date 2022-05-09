@@ -22,7 +22,7 @@ type URLShortenerHandler struct {
 }
 
 // Repository описывает контракт работы с хранилищем.
-// Используется для удобства тестирования и для дальнейшей легкой мигарции на другой "движок".
+// Используется для удобства тестирования и для дальнейшей легкой миграции на другой "движок".
 type Repository interface {
 	IsExist(id string) bool
 	Store(id string, link string) (err error)
@@ -42,7 +42,7 @@ func NewURLShortenerHandler(base string, repo Repository) *URLShortenerHandler {
 	return &h
 }
 
-// ServeHTTP - реализация метода интефрейса http.Handler
+// ServeHTTP - реализация метода интерфейса http.Handler
 func (s URLShortenerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
@@ -115,7 +115,7 @@ func (s URLShortenerHandler) HandlePostShorten(w http.ResponseWriter, r *http.Re
 	}
 }
 
-// shorten - возвращает короткую ссылку в ответ на оригинальную
+// shorten возвращает короткую ссылку в ответ на оригинальную
 func (s URLShortenerHandler) shorten(originalURL string) (shortenedURL string, err error) {
 	id, err := utils.CreateShortID(s.linkRepo.IsExist)
 	if err != nil {
@@ -129,7 +129,7 @@ func (s URLShortenerHandler) shorten(originalURL string) (shortenedURL string, e
 	return shortenedURL, nil
 }
 
-// HandleGet - ручка для для открытия по короткой ссылке
+// HandleGet - ручка для открытия по короткой ссылке
 func (s URLShortenerHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	u, err := s.linkRepo.Restore(id)
