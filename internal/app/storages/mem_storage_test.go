@@ -1,9 +1,10 @@
-package app
+package storages
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestLinkStorage_Restore(t *testing.T) {

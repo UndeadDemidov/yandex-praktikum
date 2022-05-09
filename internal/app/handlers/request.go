@@ -1,4 +1,4 @@
-package app
+package handlers
 
 // URLShortenRequest represents JSON {"url":"<some_url>"}
 type URLShortenRequest struct {

@@ -1,8 +1,10 @@
-package app
+package storages
 
 import (
 	"fmt"
 	"sync"
+
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
 )
 
 const (
@@ -10,13 +12,14 @@ const (
 	ErrIDAlreadyExists = "passed id %s already exists in the storage"
 )
 
-// LinkStorage является потоко НЕ безопасная реализация Repository
+// LinkStorage реализует хранение ссылок в памяти.
+// Является потоко безопасной реализацией Repository
 type LinkStorage struct {
 	mx      sync.Mutex
 	storage map[string]string
 }
 
-var _ Repository = (*LinkStorage)(nil)
+var _ handlers.Repository = (*LinkStorage)(nil)
 
 // NewLinkStorage cоздает и возвращает экземпляр LinkStorage
 func NewLinkStorage() *LinkStorage {
@@ -57,6 +60,12 @@ func (ls *LinkStorage) Restore(id string) (link string, err error) {
 		return "", fmt.Errorf(ErrLinkNotFound, id)
 	}
 	return l, nil
+}
+
+// Close ничего не делает, требуется только для совместимости с контрактом
+func (ls *LinkStorage) Close() error {
+	// Do nothing
+	return nil
 }
 
 // isExist проверяет наличие id в сторадже

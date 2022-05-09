@@ -1,12 +1,15 @@
-package app
+package handlers
 
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/go-chi/chi/v5"
+
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
 )
 
 // URLShortenerHandler - реализация интерфейса http.Handler
@@ -24,13 +27,14 @@ type Repository interface {
 	IsExist(id string) bool
 	Store(id string, link string) (err error)
 	Restore(id string) (link string, err error)
+	Close() error
 }
 
 // NewURLShortenerHandler создает URLShortenerHandler и инициализирует его
 func NewURLShortenerHandler(base string, repo Repository) *URLShortenerHandler {
 	h := URLShortenerHandler{}
 	h.linkRepo = repo
-	if IsURL(base) {
+	if utils.IsURL(base) {
 		h.baseURL = fmt.Sprintf("%s/", strings.TrimRight(base, "/"))
 	} else {
 		h.baseURL = "http://localhost:8080/"
@@ -64,7 +68,7 @@ func (s URLShortenerHandler) HandlePost(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	link := string(b)
-	if !IsURL(link) {
+	if !utils.IsURL(link) {
 		http.Error(w, "Hey, Dude! Provide a link! Not the crap!", http.StatusBadRequest)
 		return
 	}
@@ -91,7 +95,7 @@ func (s URLShortenerHandler) HandlePostShorten(w http.ResponseWriter, r *http.Re
 		http.Error(w, "JSON {\"url\":\"<some_url>\"} is expected", http.StatusBadRequest)
 		return
 	}
-	if !IsURL(req.URL) {
+	if !utils.IsURL(req.URL) {
 		http.Error(w, "Hey, Dude! Provide a link! Not the crap!", http.StatusBadRequest)
 		return
 	}
@@ -113,7 +117,7 @@ func (s URLShortenerHandler) HandlePostShorten(w http.ResponseWriter, r *http.Re
 
 // shorten - возвращает короткую ссылку в ответ на оригинальную
 func (s URLShortenerHandler) shorten(originalURL string) (shortenedURL string, err error) {
-	id, err := CreateShortID(s.linkRepo.IsExist)
+	id, err := utils.CreateShortID(s.linkRepo.IsExist)
 	if err != nil {
 		return "", err
 	}

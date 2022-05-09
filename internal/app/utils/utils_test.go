@@ -1,4 +1,4 @@
-package app
+package utils
 
 import (
 	"testing"
@@ -53,6 +53,35 @@ func TestIsURL(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			if got := IsURL(tt.args.str); got != tt.want {
 				t.Errorf("IsURL() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCheckFilename(t *testing.T) {
+	type args struct {
+		filename string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name:    "proper file name",
+			args:    args{filename: "test.tmp"},
+			wantErr: false,
+		},
+		{
+			name:    "empty file name",
+			args:    args{filename: ""},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := CheckFilename(tt.args.filename); (err != nil) != tt.wantErr {
+				t.Errorf("CheckFilename() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

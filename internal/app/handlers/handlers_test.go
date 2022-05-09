@@ -1,17 +1,20 @@
-package app
+package handlers
 
 import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/go-chi/chi/v5"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"github.com/go-chi/chi/v5"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
 )
 
 func TestURLShortenerHandler_HandlePost(t *testing.T) {
@@ -64,7 +67,7 @@ func TestURLShortenerHandler_HandlePost(t *testing.T) {
 			require.NoError(t, err)
 
 			assert.Equal(t, tt.want.status, result.StatusCode)
-			assert.Equal(t, tt.want.isURL, IsURL(string(urlResult)))
+			assert.Equal(t, tt.want.isURL, utils.IsURL(string(urlResult)))
 		})
 	}
 }

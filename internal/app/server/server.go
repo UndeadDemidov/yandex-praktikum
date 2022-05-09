@@ -1,9 +1,13 @@
-package app
+package server
 
 import (
+	"net/http"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
-	"net/http"
+
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app/storages"
 )
 
 // NewServerWithBuiltinRepository создает и возвращает новый сервер со встроенным репозиторием
@@ -13,14 +17,14 @@ import (
 // Эндпоинт GET /{id} принимает в качестве URL-параметра идентификатор сокращённого URL и возвращает ответ с кодом 307 и оригинальным URL в HTTP-заголовке Location.
 // Нужно учесть некорректные запросы и возвращать для них ответ с кодом 400.
 func NewServerWithBuiltinRepository(baseURL string, addr string) *http.Server {
-	linkStore := NewLinkStorage()
+	linkStore := storages.NewLinkStorage()
 	return NewServer(baseURL, addr, linkStore)
 }
 
 // NewServer создает и возвращает новый сервер с указанным репозиторием коротких ссылок
-func NewServer(baseURL string, addr string, repo Repository) *http.Server {
+func NewServer(baseURL string, addr string, repo handlers.Repository) *http.Server {
 	linkStore := repo
-	handler := NewURLShortenerHandler(baseURL, linkStore)
+	handler := handlers.NewURLShortenerHandler(baseURL, linkStore)
 
 	r := chi.NewRouter()
 	r.Use(middleware.RequestID)
