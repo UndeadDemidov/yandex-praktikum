@@ -16,6 +16,8 @@ import (
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/storages"
 )
 
+// ToDo Поленился вынести все в что-нибудь типа Execute()
+// Сделаю в первый же выходной перед 3-м спринтом
 func main() {
 	var s *http.Server
 	var r handlers.Repository

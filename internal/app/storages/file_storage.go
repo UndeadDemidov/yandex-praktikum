@@ -18,9 +18,12 @@ import (
 // - Никогда не изобретай велосипед, все равно колеса круглее не будут.
 // https://github.com/akrylysov/pogreb
 // https://youtu.be/CFPcxRN0xp8
-// Заменю после сдачи 2-го спринта
+// ToDo Заменю после сдачи 2-го спринта
 type FileStorage struct {
-	mx            sync.Mutex
+	mx sync.Mutex
+	// Ридер один, но в теории правильней было бы сделать пул ридеров,
+	// так как в таком сервисе кол-во чтений в разы (десятки/сотни раз) больше,
+	// чем записей
 	storageReader *reader
 	storageWriter *writer
 }
@@ -106,7 +109,7 @@ func (f *FileStorage) Restore(id string) (link string, err error) {
 	}
 }
 
-// Close закрывает все дескрипторы файлов, открытых для записи и чтения
+// Close закрывает все файлы, открытых для записи и чтения
 func (f *FileStorage) Close() error {
 	err1 := f.storageReader.Close()
 	err2 := f.storageWriter.Close()
