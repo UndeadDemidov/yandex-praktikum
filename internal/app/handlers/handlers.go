@@ -15,8 +15,8 @@ import (
 // URLShortenerHandler - реализация интерфейса http.Handler
 // Согласно заданию 1-го инкремента
 type URLShortenerHandler struct {
-	//non-persistent storage
-	//just for starting
+	// non-persistent storage
+	// just for starting
 	linkRepo Repository
 	baseURL  string
 }

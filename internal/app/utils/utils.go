@@ -26,8 +26,11 @@ func CheckFilename(filename string) (err error) {
 
 	// Attempt to create it
 	var d []byte
-	if err = ioutil.WriteFile(filename, d, 0644); err == nil {
-		_ = os.Remove(filename) // And delete it
+	if err = ioutil.WriteFile(filename, d, 0644); err == nil { //nolint:gosec
+		err = os.Remove(filename) // And delete it
+		if err != nil {
+			return err
+		}
 		return nil
 	}
 

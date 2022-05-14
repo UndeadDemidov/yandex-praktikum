@@ -21,7 +21,7 @@ func init() {
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 
 	// To debug config use
-	//for _, s := range viper.AllKeys() {
+	// for _, s := range viper.AllKeys() {
 	//	log.Printf("%s = %v\n", s, viper.Get(s))
-	//}
+	// }
 }

@@ -82,7 +82,7 @@ func TestLinkStorage_Store(t *testing.T) {
 			wantErr: assert.NoError,
 		},
 		{
-			//ToDo - с реализацией работы с дубликатами переписать тест
+			// ToDo - с реализацией работы с дубликатами переписать тест
 			name: "store existing link",
 			fields: fields{storage: map[string]string{
 				"1111": "https://ya.ru",

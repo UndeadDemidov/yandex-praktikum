@@ -72,6 +72,7 @@ func TestURLShortenerHandler_HandlePost(t *testing.T) {
 	}
 }
 
+//nolint:funlen
 func TestURLShortenerHandler_HandlePostShorten(t *testing.T) {
 	type want struct {
 		status  int
