@@ -16,7 +16,13 @@ func Decompress(next http.Handler) http.Handler {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			defer gz.Close()
+			defer func(gz *gzip.Reader) {
+				err := gz.Close()
+				if err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
+			}(gz)
 			r.Body = gz
 		}
 		next.ServeHTTP(w, r)

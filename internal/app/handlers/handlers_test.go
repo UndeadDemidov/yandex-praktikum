@@ -10,11 +10,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
 )
 
 func TestURLShortenerHandler_HandlePost(t *testing.T) {

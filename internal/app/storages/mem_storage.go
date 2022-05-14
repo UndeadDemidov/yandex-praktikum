@@ -38,8 +38,6 @@ func (ls *LinkStorage) IsExist(id string) bool {
 
 // Store сохраняет ссылку в хранилище и возвращает короткий ID
 func (ls *LinkStorage) Store(id string, link string) (err error) {
-	// ToDo Пока без реализации избегания дубликатов. Если скажете - доделаю.
-	// Но лучше оставить до перехода на БД
 	ls.mx.Lock()
 	defer ls.mx.Unlock()
 

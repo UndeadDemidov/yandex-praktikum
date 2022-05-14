@@ -1,12 +1,12 @@
 package server
 
 import (
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"net/http"
 
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
 	midware "github.com/UndeadDemidov/yandex-praktikum/internal/app/middleware"
+	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 )
 
 // NewServer создает и возвращает новый сервер с указанным репозиторием коротких ссылок

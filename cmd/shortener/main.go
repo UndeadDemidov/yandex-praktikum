@@ -9,16 +9,18 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/spf13/viper"
-
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/server"
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/storages"
+	"github.com/spf13/viper"
 )
 
-// ToDo Поленился вынести все в что-нибудь типа Execute()
-// Сделаю в первый же выходной перед 3-м спринтом
 func main() {
+	srv, repo := CreateServer()
+	Run(srv, repo)
+}
+
+func CreateServer() (*http.Server, handlers.Repository) {
 	var (
 		srv  *http.Server
 		repo handlers.Repository
@@ -30,10 +32,12 @@ func main() {
 		log.Print("In memory storage will be used")
 	}
 	srv = server.NewServer(viper.GetString("base-url"), viper.GetString("server-address"), repo)
+	return srv, repo
+}
 
-	// Пришлось сделать graceful shutdown, чтобы правильно закрывать файлы при остановке сервера
-	done := make(chan os.Signal, 1)
-	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+func Run(srv *http.Server, repo handlers.Repository) {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -42,20 +46,20 @@ func main() {
 	}()
 	log.Print("Server started")
 
-	<-done
-	log.Print("Server stopped")
-
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer func() {
-		err := repo.Close()
-		if err != nil {
-			log.Printf("Caught error due closing file:%+v", err)
+	if <-ctx.Done(); true {
+		log.Print("Server stopped")
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer func() {
+			err := repo.Close()
+			if err != nil {
+				log.Printf("Caught an error due closing file:%+v", err)
+			}
+			cancel()
+		}()
+		if err := srv.Shutdown(ctx); err != nil {
+			log.Printf("Server Shutdown Failed:%+v", err)
 		}
-		cancel()
-	}()
-
-	if err := srv.Shutdown(ctx); err != nil {
-		log.Printf("Server Shutdown Failed:%+v", err)
+		stop()
+		log.Print("Server exited properly")
 	}
-	log.Print("Server exited properly")
 }

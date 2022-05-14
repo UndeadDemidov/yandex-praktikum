@@ -7,9 +7,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/go-chi/chi/v5"
-
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
+	"github.com/go-chi/chi/v5"
 )
 
 // URLShortenerHandler - реализация интерфейса http.Handler
