@@ -12,6 +12,7 @@ import (
 
 func TestFileStorage_Store(t *testing.T) {
 	type args struct {
+		user string
 		id   string
 		link string
 	}
@@ -23,6 +24,7 @@ func TestFileStorage_Store(t *testing.T) {
 		{
 			name: "adding new item 1",
 			args: args{
+				user: "xxxx",
 				id:   "1111",
 				link: "https://ya.ru",
 			},
@@ -31,6 +33,7 @@ func TestFileStorage_Store(t *testing.T) {
 		{
 			name: "adding new item 2",
 			args: args{
+				user: "xxxx",
 				id:   "2222",
 				link: "https://yandex.ru",
 			},
@@ -56,7 +59,7 @@ func TestFileStorage_Store(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.wantErr(t, fs.Store(tt.args.id, tt.args.link), fmt.Sprintf("Store(%v, %v)", tt.args.id, tt.args.link))
+			tt.wantErr(t, fs.Store(tt.args.user, tt.args.id, tt.args.link), fmt.Sprintf("Store(%v, %v)", tt.args.id, tt.args.link))
 		})
 	}
 }
@@ -106,7 +109,8 @@ func TestFileStorage_IsExist(t *testing.T) {
 
 func TestFileStorage_Restore(t *testing.T) {
 	type args struct {
-		id string
+		user string
+		id   string
 	}
 	tests := []struct {
 		name     string
@@ -116,19 +120,19 @@ func TestFileStorage_Restore(t *testing.T) {
 	}{
 		{
 			name:     "searching first item",
-			args:     args{id: "1111"},
+			args:     args{user: "xxxx", id: "1111"},
 			wantLink: "https://ya.ru",
 			wantErr:  assert.NoError,
 		},
 		{
 			name:     "searching last item",
-			args:     args{id: "4444"},
+			args:     args{user: "xxxx", id: "4444"},
 			wantLink: "https://github.com/spf13/afero",
 			wantErr:  assert.NoError,
 		},
 		{
 			name:     "searching non existing item",
-			args:     args{id: "5555"},
+			args:     args{user: "xxxx", id: "5555"},
 			wantLink: "",
 			wantErr:  assert.Error,
 		},
@@ -146,7 +150,7 @@ func TestFileStorage_Restore(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotLink, err := fs.Restore(tt.args.id)
+			gotLink, err := fs.Restore(tt.args.user, tt.args.id)
 			if !tt.wantErr(t, err, fmt.Sprintf("Restore(%v)", tt.args.id)) {
 				return
 			}

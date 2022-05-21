@@ -9,10 +9,11 @@ import (
 
 func TestLinkStorage_Restore(t *testing.T) {
 	type fields struct {
-		storage map[string]string
+		storage map[string]map[string]string
 	}
 	type args struct {
-		id string
+		user string
+		id   string
 	}
 	tests := []struct {
 		name     string
@@ -23,23 +24,27 @@ func TestLinkStorage_Restore(t *testing.T) {
 	}{
 		{
 			name: "valid id",
-			fields: fields{storage: map[string]string{
-				"1111": "https://ya.ru",
-				"2222": "https://yandex.ru",
-				"3333": "https://practicum.yandex.ru/",
+			fields: fields{storage: map[string]map[string]string{
+				"xxxx": {
+					"1111": "https://ya.ru",
+					"2222": "https://yandex.ru",
+					"3333": "https://practicum.yandex.ru/",
+				},
 			}},
-			args:     args{"1111"},
+			args:     args{"xxxx", "1111"},
 			wantLink: "https://ya.ru",
 			wantErr:  assert.NoError,
 		},
 		{
 			name: "invalid id",
-			fields: fields{storage: map[string]string{
-				"1111": "https://ya.ru",
-				"2222": "https://yandex.ru",
-				"3333": "https://practicum.yandex.ru/",
+			fields: fields{storage: map[string]map[string]string{
+				"xxxx": {
+					"1111": "https://ya.ru",
+					"2222": "https://yandex.ru",
+					"3333": "https://practicum.yandex.ru/",
+				},
 			}},
-			args:     args{"4444"},
+			args:     args{"xxxx", "4444"},
 			wantLink: "",
 			wantErr:  assert.Error,
 		},
@@ -49,7 +54,7 @@ func TestLinkStorage_Restore(t *testing.T) {
 			ls := LinkStorage{
 				storage: tt.fields.storage,
 			}
-			gotLink, err := ls.Restore(tt.args.id)
+			gotLink, err := ls.Restore(tt.args.user, tt.args.id)
 			if !tt.wantErr(t, err, fmt.Sprintf("Restore(%v)", tt.args.id)) {
 				return
 			}
@@ -60,9 +65,10 @@ func TestLinkStorage_Restore(t *testing.T) {
 
 func TestLinkStorage_Store(t *testing.T) {
 	type fields struct {
-		storage map[string]string
+		storage map[string]map[string]string
 	}
 	type args struct {
+		user string
 		id   string
 		link string
 	}
@@ -74,30 +80,36 @@ func TestLinkStorage_Store(t *testing.T) {
 	}{
 		{
 			name: "store new link",
-			fields: fields{storage: map[string]string{
-				"1111": "https://ya.ru",
-				"2222": "https://yandex.ru",
+			fields: fields{storage: map[string]map[string]string{
+				"xxxx": {
+					"1111": "https://ya.ru",
+					"2222": "https://yandex.ru",
+				},
 			}},
-			args:    args{"3333", "https://practicum.yandex.ru/"},
+			args:    args{"xxxx", "3333", "https://practicum.yandex.ru/"},
 			wantErr: assert.NoError,
 		},
 		{
 			// ToDo - с реализацией работы с дубликатами переписать тест
 			name: "store existing link",
-			fields: fields{storage: map[string]string{
-				"1111": "https://ya.ru",
-				"2222": "https://yandex.ru",
+			fields: fields{storage: map[string]map[string]string{
+				"xxxx": {
+					"1111": "https://ya.ru",
+					"2222": "https://yandex.ru",
+				},
 			}},
-			args:    args{"3333", "https://yandex.ru"},
+			args:    args{"xxxx", "3333", "https://yandex.ru"},
 			wantErr: assert.NoError,
 		},
 		{
 			name: "store with same id",
-			fields: fields{storage: map[string]string{
-				"1111": "https://ya.ru",
-				"2222": "https://yandex.ru",
+			fields: fields{storage: map[string]map[string]string{
+				"xxxx": {
+					"1111": "https://ya.ru",
+					"2222": "https://yandex.ru",
+				},
 			}},
-			args:    args{"2222", "https://practicum.yandex.ru/"},
+			args:    args{"xxxx", "2222", "https://practicum.yandex.ru/"},
 			wantErr: assert.Error,
 		},
 	}
@@ -106,7 +118,7 @@ func TestLinkStorage_Store(t *testing.T) {
 			ls := LinkStorage{
 				storage: tt.fields.storage,
 			}
-			err := ls.Store(tt.args.id, tt.args.link)
+			err := ls.Store(tt.args.user, tt.args.id, tt.args.link)
 			if !tt.wantErr(t, err, fmt.Sprintf("Store(%v)", tt.args.link)) {
 				return
 			}

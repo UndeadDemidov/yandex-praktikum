@@ -1,6 +1,9 @@
 package handlers
 
-import "errors"
+import (
+	"errors"
+	"fmt"
+)
 
 const mockedID = "1111"
 
@@ -11,16 +14,18 @@ type RepoMock struct {
 	singleItemStorage string
 }
 
+var _ Repository = (*RepoMock)(nil)
+
 func (rm RepoMock) IsExist(_ string) bool {
 	return false
 }
 
-func (rm RepoMock) Store(_ string, _ string) (err error) {
+func (rm RepoMock) Store(_ string, _ string, _ string) (err error) {
 	// rm.singleItemStorage = link
 	return nil
 }
 
-func (rm RepoMock) Restore(id string) (link string, err error) {
+func (rm RepoMock) Restore(_ string, id string) (link string, err error) {
 	if id != mockedID {
 		return "", ErrNotExistedID
 	}
@@ -29,4 +34,13 @@ func (rm RepoMock) Restore(id string) (link string, err error) {
 
 func (rm RepoMock) Close() error {
 	return nil
+}
+
+func (rm RepoMock) GetUserBucket(_, _ string) (bucket []BucketItem) {
+	return []BucketItem{
+		{
+			ShortURL:    fmt.Sprintf("http://localhost:8080/%s", mockedID),
+			OriginalURL: rm.singleItemStorage,
+		},
+	}
 }
