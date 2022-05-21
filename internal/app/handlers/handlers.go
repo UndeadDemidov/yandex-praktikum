@@ -81,9 +81,6 @@ func (s URLShortenerHandler) HandlePostShortenJSON(w http.ResponseWriter, r *htt
 	}
 
 	user := midware.GetUserID(r.Context())
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
 	shortenedURL, err := s.shorten(user, req.URL)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)

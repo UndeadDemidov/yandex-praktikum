@@ -13,8 +13,8 @@ import (
 )
 
 const (
-	USER_ID_COOKIE      = "YPUserID"
-	CONTEXT_USER_ID_KEY = "YPUserID"
+	UserIdCookie     = "YPUserID"
+	ContextUserIdKey = "YPUserID"
 )
 
 var (
@@ -30,7 +30,7 @@ func UserCookie(next http.Handler) http.Handler {
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
-		ctx = context.WithValue(ctx, CONTEXT_USER_ID_KEY, user)
+		ctx = context.WithValue(ctx, ContextUserIdKey, user)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}
 	return http.HandlerFunc(fn)
@@ -42,7 +42,7 @@ func getUserID(w http.ResponseWriter, r *http.Request) (userID string, err error
 		return "", err
 	}
 	// получить куку пользователя
-	c, err := r.Cookie(USER_ID_COOKIE)
+	c, err := r.Cookie(UserIdCookie)
 	if errors.Is(err, http.ErrNoCookie) {
 		http.SetCookie(w, cookie.Cookie)
 	} else {
@@ -61,12 +61,12 @@ func getUserID(w http.ResponseWriter, r *http.Request) (userID string, err error
 	return cookie.BaseValue, nil
 }
 
-// GetUserID возвращает сохраненный в контексте куку USER_ID_COOKIE
+// GetUserID возвращает сохраненный в контексте куку UserIdCookie
 func GetUserID(ctx context.Context) string {
 	if ctx == nil {
 		return ""
 	}
-	if reqID, ok := ctx.Value(CONTEXT_USER_ID_KEY).(string); ok {
+	if reqID, ok := ctx.Value(ContextUserIdKey).(string); ok {
 		return reqID
 	}
 	return ""
@@ -85,7 +85,7 @@ func NewUserIDSignedCookie() (sc SignedCookie, err error) {
 	sc = SignedCookie{
 		Cookie: &http.Cookie{
 			Path:   "/",
-			Name:   USER_ID_COOKIE,
+			Name:   UserIdCookie,
 			Value:  uuid.New().String(),
 			MaxAge: 60 * 10,
 			// MaxAge:     60*60*24*180, // За полгода планирую уложиться
