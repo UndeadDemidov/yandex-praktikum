@@ -134,13 +134,14 @@ func (s URLShortenerHandler) HandleGetUserURLsBucket(w http.ResponseWriter, r *h
 		return
 	}
 
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
 	err := json.NewEncoder(w).Encode(&bucket)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
 }
 
 // HandleMethodNotAllowed обрабатывает не валидный HTTP метод
