@@ -20,15 +20,6 @@ type URLShortenerHandler struct {
 	baseURL  string
 }
 
-// Repository описывает контракт работы с хранилищем.
-// Используется для удобства тестирования и для дальнейшей легкой миграции на другой "движок".
-type Repository interface {
-	IsExist(id string) bool
-	Store(user string, id string, link string) (err error)
-	Restore(user string, id string) (link string, err error)
-	Close() error
-}
-
 // NewURLShortenerHandler создает URLShortenerHandler и инициализирует его
 func NewURLShortenerHandler(base string, repo Repository) *URLShortenerHandler {
 	h := URLShortenerHandler{}
@@ -141,6 +132,27 @@ func (s URLShortenerHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
+// HandleGetUserURLsBucket - ручка для получения всех ссылок пользователя
+func (s URLShortenerHandler) HandleGetUserURLsBucket(w http.ResponseWriter, r *http.Request) {
+	// ToDo заменить на middleware
+	user, err := s.getUserID(w, r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	bucket := s.linkRepo.GetUserBucket(s.baseURL, user)
+	if len(bucket) == 0 {
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+
+	err = json.NewEncoder(w).Encode(&bucket)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.WriteHeader(http.StatusOK)
+}
+
 // HandleMethodNotAllowed обрабатывает не валидный HTTP метод
 func (s URLShortenerHandler) HandleMethodNotAllowed(w http.ResponseWriter, _ *http.Request) {
 	http.Error(w, "Only GET and POST requests are allowed!", http.StatusMethodNotAllowed)
@@ -184,4 +196,20 @@ func (s URLShortenerHandler) getUserID(w http.ResponseWriter, r *http.Request) (
 		}
 	}
 	return cookie.BaseValue, nil
+}
+
+// Repository описывает контракт работы с хранилищем.
+// Используется для удобства тестирования и для дальнейшей легкой миграции на другой "движок".
+type Repository interface {
+	IsExist(id string) bool
+	Store(user string, id string, link string) (err error)
+	Restore(user string, id string) (link string, err error)
+	Close() error
+	GetUserBucket(baseURL, user string) (bucket []BucketItem)
+}
+
+// BucketItem представляет собой структуру, в которой требуется сериализовать список ссылок
+type BucketItem struct {
+	ShortURL    string `json:"short_url"`
+	OriginalURL string `json:"original_url"`
 }

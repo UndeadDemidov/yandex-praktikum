@@ -30,7 +30,7 @@ func NewServer(baseURL string, addr string, repo handlers.Repository) *http.Serv
 	r.Post("/", handler.HandlePostShortenPlain)
 	r.Post("/api/shorten", handler.HandlePostShortenJSON)
 	r.Get("/{id}", handler.HandleGet)
-	r.Get("/test/cookie", handler.HandleTestCookie)
+	r.Get("/api/user/urls", handler.HandleGetUserURLsBucket)
 	r.NotFound(handler.HandleNotFound)
 	r.MethodNotAllowed(handler.HandleMethodNotAllowed)
 

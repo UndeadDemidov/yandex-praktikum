@@ -2,7 +2,9 @@ package storages
 
 import (
 	"bufio"
+	"bytes"
 	"encoding/json"
+	"fmt"
 	"io"
 	"os"
 	"strings"
@@ -69,11 +71,11 @@ func (f *FileStorage) IsExist(id string) bool {
 }
 
 // Store - сохраняет ID и ссылку в формате JSON во внешнем файле
-func (f *FileStorage) Store(id string, link string) error {
+func (f *FileStorage) Store(user string, id string, link string) error {
 	f.mx.Lock()
 	defer f.mx.Unlock()
 
-	a := Alias{Key: id, URL: link}
+	a := Alias{User: user, Key: id, URL: link}
 	err := f.storageWriter.Write(&a)
 	if err != nil {
 		return err
@@ -83,7 +85,7 @@ func (f *FileStorage) Store(id string, link string) error {
 }
 
 // Restore - находит по ID ссылку во внешнем файле, где данные хранятся в формате JSON
-func (f *FileStorage) Restore(id string) (link string, err error) {
+func (f *FileStorage) Restore(user string, id string) (link string, err error) {
 	f.mx.Lock()
 	defer f.mx.Unlock()
 
@@ -98,10 +100,45 @@ func (f *FileStorage) Restore(id string) (link string, err error) {
 			return "", err
 		}
 
-		if alias.Key == id {
+		if alias.User == user && alias.Key == id {
 			return alias.URL, nil
 		}
 	}
+}
+
+func (f *FileStorage) GetUserBucket(baseURL, user string) (bucket []handlers.BucketItem) {
+	f.mx.Lock()
+	defer f.mx.Unlock()
+
+	bucket = []handlers.BucketItem{}
+	_, err := f.storageReader.file.Seek(0, io.SeekStart)
+	if err != nil {
+		return []handlers.BucketItem{}
+	}
+
+	scanner := bufio.NewScanner(f.storageReader.file)
+	for scanner.Scan() {
+		txt := scanner.Text()
+		if strings.Contains(txt, user) {
+			alias := &Alias{}
+			// ToDo вынести декодеры из reader/writer? Что-то не режется красиво на слои
+			// Либо опять по всему файлу бежать с unmarshal
+			dec := json.NewDecoder(bytes.NewBufferString(txt))
+			if err := dec.Decode(&alias); err != nil {
+				return []handlers.BucketItem{}
+			}
+			bucket = append(bucket, handlers.BucketItem{
+				ShortURL:    fmt.Sprintf("%s%s", baseURL, alias.Key),
+				OriginalURL: alias.URL,
+			})
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return []handlers.BucketItem{}
+	}
+
+	return bucket
 }
 
 // Close закрывает все файлы, открытых для записи и чтения
@@ -158,11 +195,11 @@ func NewReader(fileName string) (*reader, error) {
 }
 
 func (c *reader) Read() (*Alias, error) {
-	event := &Alias{}
-	if err := c.decoder.Decode(&event); err != nil {
+	alias := &Alias{}
+	if err := c.decoder.Decode(&alias); err != nil {
 		return nil, err
 	}
-	return event, nil
+	return alias, nil
 }
 
 func (c *reader) Close() error {
@@ -171,6 +208,7 @@ func (c *reader) Close() error {
 
 // Alias - структура хранения ID и URL во внешнем файле
 type Alias struct {
-	Key string
-	URL string
+	User string
+	Key  string
+	URL  string
 }

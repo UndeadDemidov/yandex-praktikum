@@ -82,3 +82,21 @@ func (ls *LinkStorage) isExist(id string) bool {
 	}
 	return false
 }
+
+func (ls *LinkStorage) GetUserBucket(baseURL, user string) (bucket []handlers.BucketItem) {
+	ls.mx.Lock()
+	defer ls.mx.Unlock()
+
+	bucket = []handlers.BucketItem{}
+	ub, ok := ls.storage[user]
+	if !ok {
+		return bucket
+	}
+	for k, v := range ub {
+		bucket = append(bucket, handlers.BucketItem{
+			ShortURL:    fmt.Sprintf("%s%s", baseURL, k),
+			OriginalURL: v,
+		})
+	}
+	return bucket
+}
