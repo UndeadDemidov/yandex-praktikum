@@ -26,6 +26,7 @@ func NewServer(baseURL string, addr string, repo handlers.Repository) *http.Serv
 	r.Use(middleware.Recoverer)
 	r.Use(middleware.Compress(5))
 	r.Use(midware.Decompress)
+	r.Use(midware.UserCookie)
 
 	r.Post("/", handler.HandlePostShortenPlain)
 	r.Post("/api/shorten", handler.HandlePostShortenJSON)

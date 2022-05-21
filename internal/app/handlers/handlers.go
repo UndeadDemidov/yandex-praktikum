@@ -2,8 +2,8 @@ package handlers
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
+	midware "github.com/UndeadDemidov/yandex-praktikum/internal/app/middleware"
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
 	"github.com/go-chi/chi/v5"
 	"io"
@@ -50,11 +50,8 @@ func (s URLShortenerHandler) HandlePostShortenPlain(w http.ResponseWriter, r *ht
 		http.Error(w, "Hey, Dude! Provide a link! Not the crap!", http.StatusBadRequest)
 		return
 	}
-	// ToDo заменить на middleware
-	user, err := s.getUserID(w, r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+
+	user := midware.GetUserID(r.Context())
 	shortenedURL, err := s.shorten(user, link)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -81,8 +78,8 @@ func (s URLShortenerHandler) HandlePostShortenJSON(w http.ResponseWriter, r *htt
 		http.Error(w, "Hey, Dude! Provide a link! Not the crap!", http.StatusBadRequest)
 		return
 	}
-	// ToDo заменить на middleware
-	user, err := s.getUserID(w, r)
+
+	user := midware.GetUserID(r.Context())
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
@@ -117,11 +114,7 @@ func (s URLShortenerHandler) shorten(user string, originalURL string) (shortened
 
 // HandleGet - ручка для открытия по короткой ссылке
 func (s URLShortenerHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
-	// ToDo заменить на middleware
-	user, err := s.getUserID(w, r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	user := midware.GetUserID(r.Context())
 	id := chi.URLParam(r, "id")
 	u, err := s.linkRepo.Restore(user, id)
 	if err != nil {
@@ -134,18 +127,14 @@ func (s URLShortenerHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
 
 // HandleGetUserURLsBucket - ручка для получения всех ссылок пользователя
 func (s URLShortenerHandler) HandleGetUserURLsBucket(w http.ResponseWriter, r *http.Request) {
-	// ToDo заменить на middleware
-	user, err := s.getUserID(w, r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
+	user := midware.GetUserID(r.Context())
 	bucket := s.linkRepo.GetUserBucket(s.baseURL, user)
 	if len(bucket) == 0 {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
-	err = json.NewEncoder(w).Encode(&bucket)
+	err := json.NewEncoder(w).Encode(&bucket)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -161,41 +150,6 @@ func (s URLShortenerHandler) HandleMethodNotAllowed(w http.ResponseWriter, _ *ht
 // HandleNotFound обрабатывает не найденный путь
 func (s URLShortenerHandler) HandleNotFound(w http.ResponseWriter, _ *http.Request) {
 	http.Error(w, `Only POST "/" with link in body and GET "/{short_link_id} are allowed" `, http.StatusNotFound)
-}
-
-// HandleTestCookie - тестовый хендлер для Cookie
-func (s URLShortenerHandler) HandleTestCookie(w http.ResponseWriter, r *http.Request) {
-	_, err := s.getUserID(w, r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-	}
-
-	w.WriteHeader(http.StatusOK)
-}
-
-func (s URLShortenerHandler) getUserID(w http.ResponseWriter, r *http.Request) (userID string, err error) {
-	cookie, err := NewUserIDSignedCookie()
-	if err != nil {
-		return "", err
-	}
-	// получить куку пользователя
-	c, err := r.Cookie(USER_ID_COOKIE)
-	if errors.Is(err, http.ErrNoCookie) {
-		http.SetCookie(w, cookie.Cookie)
-	} else {
-		cookie.Cookie = c
-		err = cookie.DetachSign()
-		if errors.Is(err, ErrSignedCookieInvalidSign) {
-			cookie, err = NewUserIDSignedCookie()
-			if err != nil {
-				return "", err
-			}
-			http.SetCookie(w, cookie.Cookie)
-		} else if err != nil {
-			return "", err
-		}
-	}
-	return cookie.BaseValue, nil
 }
 
 // Repository описывает контракт работы с хранилищем.
