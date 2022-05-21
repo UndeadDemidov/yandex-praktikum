@@ -85,7 +85,7 @@ func (f *FileStorage) Store(user string, id string, link string) error {
 }
 
 // Restore - находит по ID ссылку во внешнем файле, где данные хранятся в формате JSON
-func (f *FileStorage) Restore(user string, id string) (link string, err error) {
+func (f *FileStorage) Restore(id string) (link string, err error) {
 	f.mx.Lock()
 	defer f.mx.Unlock()
 
@@ -100,7 +100,7 @@ func (f *FileStorage) Restore(user string, id string) (link string, err error) {
 			return "", err
 		}
 
-		if alias.User == user && alias.Key == id {
+		if alias.Key == id {
 			return alias.URL, nil
 		}
 	}

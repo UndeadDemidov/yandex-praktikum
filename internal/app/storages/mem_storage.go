@@ -54,15 +54,18 @@ func (ls *LinkStorage) Store(user string, id string, link string) (err error) {
 }
 
 // Restore возвращает исходную ссылку по переданному короткому ID
-func (ls *LinkStorage) Restore(user string, id string) (link string, err error) {
+func (ls *LinkStorage) Restore(id string) (link string, err error) {
 	ls.mx.Lock()
 	defer ls.mx.Unlock()
 
-	l, ok := ls.storage[user][id]
-	if !ok {
-		return "", fmt.Errorf(ErrLinkNotFound, id)
+	for _, user := range ls.storage {
+		l, ok := user[id]
+		if ok {
+			return l, nil
+		}
 	}
-	return l, nil
+
+	return "", fmt.Errorf(ErrLinkNotFound, id)
 }
 
 // Close ничего не делает, требуется только для совместимости с контрактом

@@ -7,7 +7,6 @@ import (
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
 	"github.com/go-chi/chi/v5"
 	"io"
-	"log"
 	"net/http"
 	"strings"
 )
@@ -98,8 +97,6 @@ func (s URLShortenerHandler) HandlePostShortenJSON(w http.ResponseWriter, r *htt
 
 // shorten возвращает короткую ссылку в ответ на оригинальную
 func (s URLShortenerHandler) shorten(user string, originalURL string) (shortenedURL string, err error) {
-	log.Println("store with user: ", user)
-
 	id, err := utils.CreateShortID(s.linkRepo.IsExist)
 	if err != nil {
 		return "", err
@@ -114,11 +111,8 @@ func (s URLShortenerHandler) shorten(user string, originalURL string) (shortened
 
 // HandleGet - ручка для открытия по короткой ссылке
 func (s URLShortenerHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
-	user := midware.GetUserID(r.Context())
-	log.Println("expand with user: ", user)
-
 	id := chi.URLParam(r, "id")
-	u, err := s.linkRepo.Restore(user, id)
+	u, err := s.linkRepo.Restore(id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -161,7 +155,7 @@ func (s URLShortenerHandler) HandleNotFound(w http.ResponseWriter, _ *http.Reque
 type Repository interface {
 	IsExist(id string) bool
 	Store(user string, id string, link string) (err error)
-	Restore(user string, id string) (link string, err error)
+	Restore(id string) (link string, err error)
 	Close() error
 	GetUserBucket(baseURL, user string) (bucket []BucketItem)
 }

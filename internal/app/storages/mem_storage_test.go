@@ -12,8 +12,7 @@ func TestLinkStorage_Restore(t *testing.T) {
 		storage map[string]map[string]string
 	}
 	type args struct {
-		user string
-		id   string
+		id string
 	}
 	tests := []struct {
 		name     string
@@ -31,7 +30,7 @@ func TestLinkStorage_Restore(t *testing.T) {
 					"3333": "https://practicum.yandex.ru/",
 				},
 			}},
-			args:     args{"xxxx", "1111"},
+			args:     args{"1111"},
 			wantLink: "https://ya.ru",
 			wantErr:  assert.NoError,
 		},
@@ -44,7 +43,7 @@ func TestLinkStorage_Restore(t *testing.T) {
 					"3333": "https://practicum.yandex.ru/",
 				},
 			}},
-			args:     args{"xxxx", "4444"},
+			args:     args{"4444"},
 			wantLink: "",
 			wantErr:  assert.Error,
 		},
@@ -54,7 +53,7 @@ func TestLinkStorage_Restore(t *testing.T) {
 			ls := LinkStorage{
 				storage: tt.fields.storage,
 			}
-			gotLink, err := ls.Restore(tt.args.user, tt.args.id)
+			gotLink, err := ls.Restore(tt.args.id)
 			if !tt.wantErr(t, err, fmt.Sprintf("Restore(%v)", tt.args.id)) {
 				return
 			}

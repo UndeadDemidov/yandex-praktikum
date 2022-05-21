@@ -109,8 +109,7 @@ func TestFileStorage_IsExist(t *testing.T) {
 
 func TestFileStorage_Restore(t *testing.T) {
 	type args struct {
-		user string
-		id   string
+		id string
 	}
 	tests := []struct {
 		name     string
@@ -120,19 +119,19 @@ func TestFileStorage_Restore(t *testing.T) {
 	}{
 		{
 			name:     "searching first item",
-			args:     args{user: "xxxx", id: "1111"},
+			args:     args{id: "1111"},
 			wantLink: "https://ya.ru",
 			wantErr:  assert.NoError,
 		},
 		{
 			name:     "searching last item",
-			args:     args{user: "xxxx", id: "4444"},
+			args:     args{id: "4444"},
 			wantLink: "https://github.com/spf13/afero",
 			wantErr:  assert.NoError,
 		},
 		{
 			name:     "searching non existing item",
-			args:     args{user: "xxxx", id: "5555"},
+			args:     args{id: "5555"},
 			wantLink: "",
 			wantErr:  assert.Error,
 		},
@@ -150,7 +149,7 @@ func TestFileStorage_Restore(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotLink, err := fs.Restore(tt.args.user, tt.args.id)
+			gotLink, err := fs.Restore(tt.args.id)
 			if !tt.wantErr(t, err, fmt.Sprintf("Restore(%v)", tt.args.id)) {
 				return
 			}

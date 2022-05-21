@@ -25,7 +25,7 @@ func (rm RepoMock) Store(_ string, _ string, _ string) (err error) {
 	return nil
 }
 
-func (rm RepoMock) Restore(_ string, id string) (link string, err error) {
+func (rm RepoMock) Restore(id string) (link string, err error) {
 	if id != mockedID {
 		return "", ErrNotExistedID
 	}
