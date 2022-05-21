@@ -12,16 +12,16 @@ import (
 	"strings"
 )
 
-const (
-	UserIdCookie     = "YPUserID"
-	ContextUserIdKey = "YPUserID"
-)
+const UserIDCookie = "YPUserID"
 
 var (
 	ErrSignedCookieInvalidValueOrUnsigned = errors.New("invalid cookie value or it is unsigned")
 	ErrSignedCookieInvalidSign            = errors.New("invalid sign")
 	ErrSignedCookieSaltNotSetProperly     = errors.New("SaltStartIdx and SaltEndIdx must be set properly")
+	ContextUserIDKey                      = LocalContext("YPUserID")
 )
+
+type LocalContext string
 
 func UserCookie(next http.Handler) http.Handler {
 	fn := func(w http.ResponseWriter, r *http.Request) {
@@ -30,7 +30,7 @@ func UserCookie(next http.Handler) http.Handler {
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 		}
-		ctx = context.WithValue(ctx, ContextUserIdKey, user)
+		ctx = context.WithValue(ctx, ContextUserIDKey, user)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}
 	return http.HandlerFunc(fn)
@@ -42,7 +42,7 @@ func getUserID(w http.ResponseWriter, r *http.Request) (userID string, err error
 		return "", err
 	}
 	// получить куку пользователя
-	c, err := r.Cookie(UserIdCookie)
+	c, err := r.Cookie(UserIDCookie)
 	if errors.Is(err, http.ErrNoCookie) {
 		http.SetCookie(w, cookie.Cookie)
 	} else {
@@ -61,12 +61,12 @@ func getUserID(w http.ResponseWriter, r *http.Request) (userID string, err error
 	return cookie.BaseValue, nil
 }
 
-// GetUserID возвращает сохраненный в контексте куку UserIdCookie
+// GetUserID возвращает сохраненный в контексте куку UserIDCookie
 func GetUserID(ctx context.Context) string {
 	if ctx == nil {
 		return ""
 	}
-	if reqID, ok := ctx.Value(ContextUserIdKey).(string); ok {
+	if reqID, ok := ctx.Value(ContextUserIDKey).(string); ok {
 		return reqID
 	}
 	return ""
@@ -85,7 +85,7 @@ func NewUserIDSignedCookie() (sc SignedCookie, err error) {
 	sc = SignedCookie{
 		Cookie: &http.Cookie{
 			Path:   "/",
-			Name:   UserIdCookie,
+			Name:   UserIDCookie,
 			Value:  uuid.New().String(),
 			MaxAge: 60 * 10,
 			// MaxAge:     60*60*24*180, // За полгода планирую уложиться
