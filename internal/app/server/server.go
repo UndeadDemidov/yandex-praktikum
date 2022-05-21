@@ -19,6 +19,7 @@ func NewServer(baseURL string, addr string, repo handlers.Repository) *http.Serv
 	handler := handlers.NewURLShortenerHandler(baseURL, linkStore)
 
 	r := chi.NewRouter()
+	r.Use(middleware.Heartbeat("/ping"))
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
@@ -26,9 +27,10 @@ func NewServer(baseURL string, addr string, repo handlers.Repository) *http.Serv
 	r.Use(middleware.Compress(5))
 	r.Use(midware.Decompress)
 
-	r.Post("/", handler.HandlePost)
-	r.Post("/api/shorten", handler.HandlePostShorten)
+	r.Post("/", handler.HandlePostShortenPlain)
+	r.Post("/api/shorten", handler.HandlePostShortenJSON)
 	r.Get("/{id}", handler.HandleGet)
+	r.Get("/test/cookie", handler.HandleTestCookie)
 	r.NotFound(handler.HandleNotFound)
 	r.MethodNotAllowed(handler.HandleMethodNotAllowed)
 

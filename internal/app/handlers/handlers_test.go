@@ -57,7 +57,7 @@ func TestURLShortenerHandler_HandlePost(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, "/", reader)
 			w := httptest.NewRecorder()
 			h := NewURLShortenerHandler("http://localhost:8080/", RepoMock{})
-			h.HandlePost(w, request)
+			h.HandlePostShortenPlain(w, request)
 			result := w.Result()
 
 			urlResult, err := ioutil.ReadAll(result.Body)
@@ -122,7 +122,7 @@ func TestURLShortenerHandler_HandlePostShorten(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, "/", reader)
 			w := httptest.NewRecorder()
 			h := NewURLShortenerHandler("http://localhost:8080/", RepoMock{})
-			h.HandlePostShorten(w, request)
+			h.HandlePostShortenJSON(w, request)
 			result := w.Result()
 
 			require.Equal(t, tt.want.status, result.StatusCode)

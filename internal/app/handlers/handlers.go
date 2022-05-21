@@ -2,13 +2,13 @@ package handlers
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
+	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
 	"strings"
-
-	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
-	"github.com/go-chi/chi/v5"
 )
 
 // URLShortenerHandler - реализация интерфейса http.Handler
@@ -41,21 +41,9 @@ func NewURLShortenerHandler(base string, repo Repository) *URLShortenerHandler {
 	return &h
 }
 
-// ServeHTTP - реализация метода интерфейса http.Handler
-func (s URLShortenerHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		s.HandleGet(w, r)
-	case http.MethodPost:
-		s.HandlePost(w, r)
-	default:
-		s.HandleMethodNotAllowed(w, r)
-	}
-}
-
-// HandlePost - ручка для создания короткой ссылки
+// HandlePostShortenPlain - ручка для создания короткой ссылки
 // Оригинальная ссылка передается через Text Body
-func (s URLShortenerHandler) HandlePost(w http.ResponseWriter, r *http.Request) {
+func (s URLShortenerHandler) HandlePostShortenPlain(w http.ResponseWriter, r *http.Request) {
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -85,9 +73,9 @@ func (s URLShortenerHandler) HandlePost(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-// HandlePostShorten - ручка для создания короткой ссылки
+// HandlePostShortenJSON - ручка для создания короткой ссылки
 // Оригинальная ссылка передается через JSON Body
-func (s URLShortenerHandler) HandlePostShorten(w http.ResponseWriter, r *http.Request) {
+func (s URLShortenerHandler) HandlePostShortenJSON(w http.ResponseWriter, r *http.Request) {
 	req := URLShortenRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -148,4 +136,39 @@ func (s URLShortenerHandler) HandleMethodNotAllowed(w http.ResponseWriter, _ *ht
 // HandleNotFound обрабатывает не найденный путь
 func (s URLShortenerHandler) HandleNotFound(w http.ResponseWriter, _ *http.Request) {
 	http.Error(w, `Only POST "/" with link in body and GET "/{short_link_id} are allowed" `, http.StatusNotFound)
+}
+
+// HandleTestCookie - тестовый хендлер для Cookie
+func (s URLShortenerHandler) HandleTestCookie(w http.ResponseWriter, r *http.Request) {
+	_, err := s.getUserID(w, r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s URLShortenerHandler) getUserID(w http.ResponseWriter, r *http.Request) (userID string, err error) {
+	cookie, err := NewUserIDSignedCookie()
+	if err != nil {
+		return "", err
+	}
+	// получить куку пользователя
+	c, err := r.Cookie(USER_ID_COOKIE)
+	if errors.Is(err, http.ErrNoCookie) {
+		http.SetCookie(w, cookie.Cookie)
+	} else {
+		cookie.Cookie = c
+		err = cookie.DetachSign()
+		if errors.Is(err, ErrSignedCookieInvalidSign) {
+			cookie, err = NewUserIDSignedCookie()
+			if err != nil {
+				return "", err
+			}
+			http.SetCookie(w, cookie.Cookie)
+		} else if err != nil {
+			return "", err
+		}
+	}
+	return cookie.BaseValue, nil
 }
