@@ -31,9 +31,10 @@ type SignedCookie struct {
 func NewUserIDSignedCookie() (sc SignedCookie, err error) {
 	sc = SignedCookie{
 		Cookie: &http.Cookie{
+			Path:   "/",
 			Name:   USER_ID_COOKIE,
 			Value:  uuid.New().String(),
-			MaxAge: 60 * 5,
+			MaxAge: 60 * 10,
 			// MaxAge:     60*60*24*180, // За полгода планирую уложиться
 		},
 		SaltStartIdx: 4,

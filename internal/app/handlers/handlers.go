@@ -24,8 +24,8 @@ type URLShortenerHandler struct {
 // Используется для удобства тестирования и для дальнейшей легкой миграции на другой "движок".
 type Repository interface {
 	IsExist(id string) bool
-	Store(id string, link string) (err error)
-	Restore(id string) (link string, err error)
+	Store(user string, id string, link string) (err error)
+	Restore(user string, id string) (link string, err error)
 	Close() error
 }
 
@@ -59,8 +59,12 @@ func (s URLShortenerHandler) HandlePostShortenPlain(w http.ResponseWriter, r *ht
 		http.Error(w, "Hey, Dude! Provide a link! Not the crap!", http.StatusBadRequest)
 		return
 	}
-
-	shortenedURL, err := s.shorten(link)
+	// ToDo заменить на middleware
+	user, err := s.getUserID(w, r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	shortenedURL, err := s.shorten(user, link)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -86,8 +90,12 @@ func (s URLShortenerHandler) HandlePostShortenJSON(w http.ResponseWriter, r *htt
 		http.Error(w, "Hey, Dude! Provide a link! Not the crap!", http.StatusBadRequest)
 		return
 	}
-
-	shortenedURL, err := s.shorten(req.URL)
+	// ToDo заменить на middleware
+	user, err := s.getUserID(w, r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+	shortenedURL, err := s.shorten(user, req.URL)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -103,12 +111,12 @@ func (s URLShortenerHandler) HandlePostShortenJSON(w http.ResponseWriter, r *htt
 }
 
 // shorten возвращает короткую ссылку в ответ на оригинальную
-func (s URLShortenerHandler) shorten(originalURL string) (shortenedURL string, err error) {
+func (s URLShortenerHandler) shorten(user string, originalURL string) (shortenedURL string, err error) {
 	id, err := utils.CreateShortID(s.linkRepo.IsExist)
 	if err != nil {
 		return "", err
 	}
-	err = s.linkRepo.Store(id, originalURL)
+	err = s.linkRepo.Store(user, id, originalURL)
 	if err != nil {
 		return "", err
 	}
@@ -118,8 +126,13 @@ func (s URLShortenerHandler) shorten(originalURL string) (shortenedURL string, e
 
 // HandleGet - ручка для открытия по короткой ссылке
 func (s URLShortenerHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
+	// ToDo заменить на middleware
+	user, err := s.getUserID(w, r)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
 	id := chi.URLParam(r, "id")
-	u, err := s.linkRepo.Restore(id)
+	u, err := s.linkRepo.Restore(user, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
