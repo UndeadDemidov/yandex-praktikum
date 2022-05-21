@@ -46,20 +46,21 @@ func Run(srv *http.Server, repo handlers.Repository) {
 	}()
 	log.Print("Server started")
 
-	if <-ctx.Done(); true {
-		log.Print("Server stopped")
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer func() {
-			err := repo.Close()
-			if err != nil {
-				log.Printf("Caught an error due closing file:%+v", err)
-			}
-			cancel()
-		}()
-		if err := srv.Shutdown(ctx); err != nil {
-			log.Printf("Server Shutdown Failed:%+v", err)
+	<-ctx.Done()
+
+	log.Print("Server stopped")
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer func() {
+		err := repo.Close()
+		if err != nil {
+			log.Printf("Caught an error due closing file:%+v", err)
 		}
-		stop()
-		log.Print("Server exited properly")
+		log.Println("Repository closed properly")
+		cancel()
+	}()
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Printf("Server Shutdown Failed:%+v", err)
 	}
+	stop()
+	log.Print("Server exited properly")
 }
