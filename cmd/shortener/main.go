@@ -33,17 +33,37 @@ func CreateServer() (*http.Server, handlers.Repository, *sql.DB) {
 	cs := viper.GetString("database-dsn")
 	if len(cs) != 0 {
 		db, err = sql.Open("postgres", cs)
-		if err == nil {
-			log.Print("Database is initialized")
+		if err != nil {
+			db = nil
 		}
 	}
 
-	if repo, err = storages.NewFileStorage(viper.GetString("file-storage-path")); err != nil {
-		repo = storages.NewLinkStorage()
-		log.Print("In memory storage will be used")
-	}
+	repo = chooseRepo(viper.GetString("file-storage-path"), db)
 	srv = server.NewServer(viper.GetString("base-url"), viper.GetString("server-address"), repo, db)
 	return srv, repo, db
+}
+
+func chooseRepo(filename string, db *sql.DB) (repo handlers.Repository) {
+	var err error
+
+	if db != nil {
+		repo, err = storages.NewDBStorage(db)
+		if err == nil {
+			log.Print("In database storage will be used")
+			return repo
+		}
+	}
+
+	if len(filename) != 0 {
+		repo, err = storages.NewFileStorage(filename)
+		if err == nil {
+			log.Print("In file storage will be used")
+			return repo
+		}
+	}
+
+	log.Print("In memory storage will be used")
+	return storages.NewLinkStorage()
 }
 
 func Run(srv *http.Server, repo handlers.Repository, db *sql.DB) {
@@ -64,13 +84,7 @@ func Run(srv *http.Server, repo handlers.Repository, db *sql.DB) {
 	defer func() {
 		err := repo.Close()
 		if err != nil {
-			log.Printf("Caught an error due closing file:%+v", err)
-		}
-		if db != nil {
-			err = db.Close()
-			if err != nil {
-				log.Printf("Caught an error due closing db:%+v", err)
-			}
+			log.Printf("Caught an error due closing repository:%+v", err)
 		}
 
 		log.Println("Everything closed properly")

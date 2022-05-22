@@ -147,29 +147,24 @@ func (s URLShortener) HandleGetUserURLsBucket(w http.ResponseWriter, r *http.Req
 	}
 }
 
-// HeartBeat - ручка для открытия по короткой ссылке
+// HeartBeat - ручка для проверки, что подключение к БД живое
 func (s URLShortener) HeartBeat(w http.ResponseWriter, r *http.Request) {
 	if s.database == nil {
 		http.Error(w, "db is not initialized", http.StatusInternalServerError)
 		return
 	}
 
-	var (
-		cancel context.CancelFunc
-		err    error
-	)
-	ctx := r.Context()
-	ctx, cancel = context.WithTimeout(ctx, 1*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), 1*time.Second)
 	defer cancel()
 
-	if err = s.database.PingContext(ctx); err != nil {
+	if err := s.database.PingContext(ctx); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
-	_, err = w.Write([]byte("I'm alive (c)Helloween"))
+	_, err := w.Write([]byte("I'm alive (c)Helloween"))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 	}
