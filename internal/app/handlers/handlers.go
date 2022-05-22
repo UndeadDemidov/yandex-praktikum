@@ -1,40 +1,47 @@
 package handlers
 
 import (
+	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
-	midware "github.com/UndeadDemidov/yandex-praktikum/internal/app/middleware"
-	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
-	"github.com/go-chi/chi/v5"
 	"io"
 	"net/http"
 	"strings"
+	"time"
+
+	midware "github.com/UndeadDemidov/yandex-praktikum/internal/app/middleware"
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
+	"github.com/go-chi/chi/v5"
 )
 
-// URLShortenerHandler - реализация интерфейса http.Handler
+// URLShortener - реализация интерфейса http.Handler
 // Согласно заданию 1-го инкремента
-type URLShortenerHandler struct {
+type URLShortener struct {
 	// non-persistent storage
 	// just for starting
 	linkRepo Repository
 	baseURL  string
+	database *sql.DB
 }
 
-// NewURLShortenerHandler создает URLShortenerHandler и инициализирует его
-func NewURLShortenerHandler(base string, repo Repository) *URLShortenerHandler {
-	h := URLShortenerHandler{}
+// NewURLShortener создает URLShortener и инициализирует его
+func NewURLShortener(base string, repo Repository, db *sql.DB) *URLShortener {
+	h := URLShortener{}
 	h.linkRepo = repo
 	if utils.IsURL(base) {
 		h.baseURL = fmt.Sprintf("%s/", strings.TrimRight(base, "/"))
 	} else {
 		h.baseURL = "http://localhost:8080/"
 	}
+	h.database = db
+
 	return &h
 }
 
 // HandlePostShortenPlain - ручка для создания короткой ссылки
 // Оригинальная ссылка передается через Text Body
-func (s URLShortenerHandler) HandlePostShortenPlain(w http.ResponseWriter, r *http.Request) {
+func (s URLShortener) HandlePostShortenPlain(w http.ResponseWriter, r *http.Request) {
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -67,7 +74,7 @@ func (s URLShortenerHandler) HandlePostShortenPlain(w http.ResponseWriter, r *ht
 
 // HandlePostShortenJSON - ручка для создания короткой ссылки
 // Оригинальная ссылка передается через JSON Body
-func (s URLShortenerHandler) HandlePostShortenJSON(w http.ResponseWriter, r *http.Request) {
+func (s URLShortener) HandlePostShortenJSON(w http.ResponseWriter, r *http.Request) {
 	req := URLShortenRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
@@ -96,7 +103,7 @@ func (s URLShortenerHandler) HandlePostShortenJSON(w http.ResponseWriter, r *htt
 }
 
 // shorten возвращает короткую ссылку в ответ на оригинальную
-func (s URLShortenerHandler) shorten(user string, originalURL string) (shortenedURL string, err error) {
+func (s URLShortener) shorten(user string, originalURL string) (shortenedURL string, err error) {
 	id, err := utils.CreateShortID(s.linkRepo.IsExist)
 	if err != nil {
 		return "", err
@@ -110,7 +117,7 @@ func (s URLShortenerHandler) shorten(user string, originalURL string) (shortened
 }
 
 // HandleGet - ручка для открытия по короткой ссылке
-func (s URLShortenerHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
+func (s URLShortener) HandleGet(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	u, err := s.linkRepo.Restore(id)
 	if err != nil {
@@ -122,7 +129,7 @@ func (s URLShortenerHandler) HandleGet(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleGetUserURLsBucket - ручка для получения всех ссылок пользователя
-func (s URLShortenerHandler) HandleGetUserURLsBucket(w http.ResponseWriter, r *http.Request) {
+func (s URLShortener) HandleGetUserURLsBucket(w http.ResponseWriter, r *http.Request) {
 	user := midware.GetUserID(r.Context())
 	bucket := s.linkRepo.GetUserBucket(s.baseURL, user)
 	if len(bucket) == 0 {
@@ -140,13 +147,41 @@ func (s URLShortenerHandler) HandleGetUserURLsBucket(w http.ResponseWriter, r *h
 	}
 }
 
+// HeartBeat - ручка для открытия по короткой ссылке
+func (s URLShortener) HeartBeat(w http.ResponseWriter, r *http.Request) {
+	if s.database == nil {
+		http.Error(w, "db is not initialized", http.StatusInternalServerError)
+		return
+	}
+
+	var (
+		cancel context.CancelFunc
+		err    error
+	)
+	ctx := r.Context()
+	ctx, cancel = context.WithTimeout(ctx, 1*time.Second)
+	defer cancel()
+
+	if err = s.database.PingContext(ctx); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "text/plain")
+	w.WriteHeader(http.StatusOK)
+	_, err = w.Write([]byte("I'm alive (c)Helloween"))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+	}
+}
+
 // HandleMethodNotAllowed обрабатывает не валидный HTTP метод
-func (s URLShortenerHandler) HandleMethodNotAllowed(w http.ResponseWriter, _ *http.Request) {
+func (s URLShortener) HandleMethodNotAllowed(w http.ResponseWriter, _ *http.Request) {
 	http.Error(w, "Only GET and POST requests are allowed!", http.StatusMethodNotAllowed)
 }
 
 // HandleNotFound обрабатывает не найденный путь
-func (s URLShortenerHandler) HandleNotFound(w http.ResponseWriter, _ *http.Request) {
+func (s URLShortener) HandleNotFound(w http.ResponseWriter, _ *http.Request) {
 	http.Error(w, `Only POST "/" with link in body and GET "/{short_link_id} are allowed" `, http.StatusNotFound)
 }
 

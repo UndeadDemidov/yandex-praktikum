@@ -56,7 +56,7 @@ func TestURLShortenerHandler_HandlePost(t *testing.T) {
 			reader := strings.NewReader(tt.body)
 			request := httptest.NewRequest(http.MethodPost, "/", reader)
 			w := httptest.NewRecorder()
-			h := NewURLShortenerHandler("http://localhost:8080/", RepoMock{})
+			h := NewURLShortener("http://localhost:8080/", RepoMock{}, nil)
 			h.HandlePostShortenPlain(w, request)
 			result := w.Result()
 
@@ -121,7 +121,7 @@ func TestURLShortenerHandler_HandlePostShorten(t *testing.T) {
 			reader := strings.NewReader(tt.reqBody)
 			request := httptest.NewRequest(http.MethodPost, "/", reader)
 			w := httptest.NewRecorder()
-			h := NewURLShortenerHandler("http://localhost:8080/", RepoMock{})
+			h := NewURLShortener("http://localhost:8080/", RepoMock{}, nil)
 			h.HandlePostShortenJSON(w, request)
 			result := w.Result()
 
@@ -181,7 +181,7 @@ func TestURLShortenerHandler_HandleGet(t *testing.T) {
 			rctx.URLParams.Add("id", tt.param)
 			r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
 
-			h := NewURLShortenerHandler("http://localhost:8080/", tt.args.repo)
+			h := NewURLShortener("http://localhost:8080/", tt.args.repo, nil)
 			w := httptest.NewRecorder()
 			h.HandleGet(w, r)
 			result := w.Result()

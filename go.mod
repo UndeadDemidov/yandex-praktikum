@@ -5,6 +5,7 @@ go 1.18
 require (
 	github.com/go-chi/chi/v5 v5.0.7
 	github.com/google/uuid v1.1.2
+	github.com/lib/pq v1.10.6
 	github.com/matoous/go-nanoid/v2 v2.0.0
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.11.0

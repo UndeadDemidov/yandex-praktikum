@@ -14,13 +14,11 @@ func Decompress(next http.Handler) http.Handler {
 			gz, err := gzip.NewReader(r.Body)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
 			}
 			defer func(gz *gzip.Reader) {
 				err := gz.Close()
 				if err != nil {
 					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
 				}
 			}(gz)
 			r.Body = gz

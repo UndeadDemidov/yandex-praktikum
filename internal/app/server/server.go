@@ -1,6 +1,7 @@
 package server
 
 import (
+	"database/sql"
 	"net/http"
 
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
@@ -10,16 +11,12 @@ import (
 )
 
 // NewServer создает и возвращает новый сервер с указанным репозиторием коротких ссылок
-// Эндпоинт POST / принимает в теле запроса строку URL для сокращения и возвращает ответ с кодом 201 и сокращённым URL в виде текстовой строки в теле.
-// Эндпоинт POST /api/shorten принимает в теле запроса JSON {"url":"<some_url>"} для сокращения и возвращает ответ с кодом 201 и сокращённым URL в виде {"result":"<shorten_url>"}
-// Эндпоинт GET /{id} принимает в качестве URL-параметра идентификатор сокращённого URL и возвращает ответ с кодом 307 и оригинальным URL в HTTP-заголовке Location.
-// Нужно учесть некорректные запросы и возвращать для них ответ с кодом 400.
-func NewServer(baseURL string, addr string, repo handlers.Repository) *http.Server {
+func NewServer(baseURL string, addr string, repo handlers.Repository, db *sql.DB) *http.Server {
 	linkStore := repo
-	handler := handlers.NewURLShortenerHandler(baseURL, linkStore)
+	handler := handlers.NewURLShortener(baseURL, linkStore, db)
 
 	r := chi.NewRouter()
-	r.Use(middleware.Heartbeat("/ping"))
+	r.Use(middleware.Heartbeat("/health"))
 	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
@@ -32,6 +29,7 @@ func NewServer(baseURL string, addr string, repo handlers.Repository) *http.Serv
 	r.Post("/api/shorten", handler.HandlePostShortenJSON)
 	r.Get("/{id}", handler.HandleGet)
 	r.Get("/api/user/urls", handler.HandleGetUserURLsBucket)
+	r.Get("/ping", handler.HeartBeat)
 	r.NotFound(handler.HandleNotFound)
 	r.MethodNotAllowed(handler.HandleMethodNotAllowed)
 
