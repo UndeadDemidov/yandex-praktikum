@@ -3,6 +3,7 @@ package storages
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -46,7 +47,7 @@ func NewFileStorage(filename string) (fs *FileStorage, err error) {
 
 // IsExist проверяет наличие в файле указанного ID
 // Если такой ID входит как подстрока в ссылку, то результат будет такой же, как если бы был найден ID
-func (f *FileStorage) IsExist(id string) bool {
+func (f *FileStorage) IsExist(_ context.Context, id string) bool {
 	f.mx.Lock()
 	defer f.mx.Unlock()
 
@@ -71,7 +72,7 @@ func (f *FileStorage) IsExist(id string) bool {
 }
 
 // Store - сохраняет ID и ссылку в формате JSON во внешнем файле
-func (f *FileStorage) Store(user string, id string, link string) error {
+func (f *FileStorage) Store(_ context.Context, user string, id string, link string) error {
 	f.mx.Lock()
 	defer f.mx.Unlock()
 
@@ -85,7 +86,7 @@ func (f *FileStorage) Store(user string, id string, link string) error {
 }
 
 // Restore - находит по ID ссылку во внешнем файле, где данные хранятся в формате JSON
-func (f *FileStorage) Restore(id string) (link string, err error) {
+func (f *FileStorage) Restore(_ context.Context, id string) (link string, err error) {
 	f.mx.Lock()
 	defer f.mx.Unlock()
 
@@ -106,7 +107,7 @@ func (f *FileStorage) Restore(id string) (link string, err error) {
 	}
 }
 
-func (f *FileStorage) GetUserBucket(baseURL, user string) (bucket []handlers.BucketItem) {
+func (f *FileStorage) GetUserBucket(_ context.Context, baseURL, user string) (bucket []handlers.BucketItem) {
 	f.mx.Lock()
 	defer f.mx.Unlock()
 

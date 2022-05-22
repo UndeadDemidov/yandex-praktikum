@@ -1,6 +1,7 @@
 package storages
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
@@ -59,7 +60,7 @@ func TestFileStorage_Store(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			tt.wantErr(t, fs.Store(tt.args.user, tt.args.id, tt.args.link), fmt.Sprintf("Store(%v, %v)", tt.args.id, tt.args.link))
+			tt.wantErr(t, fs.Store(context.Background(), tt.args.user, tt.args.id, tt.args.link), fmt.Sprintf("Store(%v, %v)", tt.args.id, tt.args.link))
 		})
 	}
 }
@@ -102,7 +103,7 @@ func TestFileStorage_IsExist(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equalf(t, tt.want, fs.IsExist(tt.args.id), "IsExist(%v)", tt.args.id)
+			assert.Equalf(t, tt.want, fs.IsExist(context.Background(), tt.args.id), "IsExist(%v)", tt.args.id)
 		})
 	}
 }
@@ -149,7 +150,7 @@ func TestFileStorage_Restore(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			gotLink, err := fs.Restore(tt.args.id)
+			gotLink, err := fs.Restore(context.Background(), tt.args.id)
 			if !tt.wantErr(t, err, fmt.Sprintf("Restore(%v)", tt.args.id)) {
 				return
 			}

@@ -50,8 +50,7 @@ func createDB(db *sql.DB) (err error) {
 	}
 
 	var cnt int64
-	row := db.QueryRowContext(ctx, checkQuery)
-	err = row.Scan(&cnt)
+	err = db.QueryRowContext(ctx, checkQuery).Scan(&cnt)
 	if err != nil {
 		return err
 	}
@@ -65,17 +64,17 @@ func createDB(db *sql.DB) (err error) {
 	return nil
 }
 
-func (d DBStorage) IsExist(id string) bool {
+func (d DBStorage) IsExist(ctx context.Context, id string) bool {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (d DBStorage) Store(user string, id string, link string) (err error) {
+func (d DBStorage) Store(ctx context.Context, user string, id string, link string) (err error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (d DBStorage) Restore(id string) (link string, err error) {
+func (d DBStorage) Restore(ctx context.Context, id string) (link string, err error) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -84,7 +83,7 @@ func (d DBStorage) Close() error {
 	return d.database.Close()
 }
 
-func (d DBStorage) GetUserBucket(baseURL, user string) (bucket []handlers.BucketItem) {
+func (d DBStorage) GetUserBucket(ctx context.Context, baseURL, user string) (bucket []handlers.BucketItem) {
 	//TODO implement me
 	panic("implement me")
 }

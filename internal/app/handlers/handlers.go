@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -13,7 +14,10 @@ import (
 	midware "github.com/UndeadDemidov/yandex-praktikum/internal/app/middleware"
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
 	"github.com/go-chi/chi/v5"
+	gonanoid "github.com/matoous/go-nanoid/v2"
 )
+
+var ErrUnableCreateShortID = errors.New("couldn't create unique ID in 10 tries")
 
 // URLShortener - реализация интерфейса http.Handler
 // Согласно заданию 1-го инкремента
@@ -58,8 +62,9 @@ func (s URLShortener) HandlePostShortenPlain(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	user := midware.GetUserID(r.Context())
-	shortenedURL, err := s.shorten(user, link)
+	ctx := r.Context()
+	user := midware.GetUserID(ctx)
+	shortenedURL, err := s.shorten(ctx, user, link)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -86,8 +91,9 @@ func (s URLShortener) HandlePostShortenJSON(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	user := midware.GetUserID(r.Context())
-	shortenedURL, err := s.shorten(user, req.URL)
+	ctx := r.Context()
+	user := midware.GetUserID(ctx)
+	shortenedURL, err := s.shorten(ctx, user, req.URL)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -103,12 +109,12 @@ func (s URLShortener) HandlePostShortenJSON(w http.ResponseWriter, r *http.Reque
 }
 
 // shorten возвращает короткую ссылку в ответ на оригинальную
-func (s URLShortener) shorten(user string, originalURL string) (shortenedURL string, err error) {
-	id, err := utils.CreateShortID(s.linkRepo.IsExist)
+func (s URLShortener) shorten(ctx context.Context, user string, originalURL string) (shortenedURL string, err error) {
+	id, err := s.createShortID(ctx)
 	if err != nil {
 		return "", err
 	}
-	err = s.linkRepo.Store(user, id, originalURL)
+	err = s.linkRepo.Store(ctx, user, id, originalURL)
 	if err != nil {
 		return "", err
 	}
@@ -116,10 +122,24 @@ func (s URLShortener) shorten(user string, originalURL string) (shortenedURL str
 	return shortenedURL, nil
 }
 
+// createShortID создает короткий ID с проверкой на валидность
+func (s URLShortener) createShortID(ctx context.Context) (id string, err error) {
+	for i := 0; i < 10; i++ {
+		id, err = gonanoid.New(8)
+		if err != nil {
+			return "", err
+		}
+		if !s.linkRepo.IsExist(ctx, id) {
+			return id, nil
+		}
+	}
+	return "", ErrUnableCreateShortID
+}
+
 // HandleGet - ручка для открытия по короткой ссылке
 func (s URLShortener) HandleGet(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	u, err := s.linkRepo.Restore(id)
+	u, err := s.linkRepo.Restore(r.Context(), id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -130,8 +150,9 @@ func (s URLShortener) HandleGet(w http.ResponseWriter, r *http.Request) {
 
 // HandleGetUserURLsBucket - ручка для получения всех ссылок пользователя
 func (s URLShortener) HandleGetUserURLsBucket(w http.ResponseWriter, r *http.Request) {
-	user := midware.GetUserID(r.Context())
-	bucket := s.linkRepo.GetUserBucket(s.baseURL, user)
+	ctx := r.Context()
+	user := midware.GetUserID(ctx)
+	bucket := s.linkRepo.GetUserBucket(ctx, s.baseURL, user)
 	if len(bucket) == 0 {
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -183,11 +204,11 @@ func (s URLShortener) HandleNotFound(w http.ResponseWriter, _ *http.Request) {
 // Repository описывает контракт работы с хранилищем.
 // Используется для удобства тестирования и для дальнейшей легкой миграции на другой "движок".
 type Repository interface {
-	IsExist(id string) bool
-	Store(user string, id string, link string) (err error)
-	Restore(id string) (link string, err error)
+	IsExist(ctx context.Context, id string) bool
+	Store(ctx context.Context, user string, id string, link string) (err error)
+	Restore(ctx context.Context, id string) (link string, err error)
 	Close() error
-	GetUserBucket(baseURL, user string) (bucket []BucketItem)
+	GetUserBucket(ctx context.Context, baseURL, user string) (bucket []BucketItem)
 }
 
 // BucketItem представляет собой структуру, в которой требуется сериализовать список ссылок

@@ -1,6 +1,7 @@
 package storages
 
 import (
+	"context"
 	"fmt"
 	"sync"
 
@@ -29,15 +30,27 @@ func NewLinkStorage() *LinkStorage {
 }
 
 // IsExist проверяет наличие id в сторадже
-func (ls *LinkStorage) IsExist(id string) bool {
+func (ls *LinkStorage) IsExist(_ context.Context, id string) bool {
 	ls.mx.Lock()
 	defer ls.mx.Unlock()
 
 	return ls.isExist(id)
 }
 
+// isExist проверяет наличие id в сторадже
+// внутреняя реализация
+func (ls *LinkStorage) isExist(id string) bool {
+	for _, m := range ls.storage {
+		_, ok := m[id]
+		if ok {
+			return true
+		}
+	}
+	return false
+}
+
 // Store сохраняет ссылку в хранилище и возвращает короткий ID
-func (ls *LinkStorage) Store(user string, id string, link string) (err error) {
+func (ls *LinkStorage) Store(_ context.Context, user string, id string, link string) (err error) {
 	ls.mx.Lock()
 	defer ls.mx.Unlock()
 
@@ -54,7 +67,7 @@ func (ls *LinkStorage) Store(user string, id string, link string) (err error) {
 }
 
 // Restore возвращает исходную ссылку по переданному короткому ID
-func (ls *LinkStorage) Restore(id string) (link string, err error) {
+func (ls *LinkStorage) Restore(_ context.Context, id string) (link string, err error) {
 	ls.mx.Lock()
 	defer ls.mx.Unlock()
 
@@ -74,19 +87,7 @@ func (ls *LinkStorage) Close() error {
 	return nil
 }
 
-// isExist проверяет наличие id в сторадже
-// внутреняя реализация
-func (ls *LinkStorage) isExist(id string) bool {
-	for _, m := range ls.storage {
-		_, ok := m[id]
-		if ok {
-			return true
-		}
-	}
-	return false
-}
-
-func (ls *LinkStorage) GetUserBucket(baseURL, user string) (bucket []handlers.BucketItem) {
+func (ls *LinkStorage) GetUserBucket(_ context.Context, baseURL, user string) (bucket []handlers.BucketItem) {
 	ls.mx.Lock()
 	defer ls.mx.Unlock()
 

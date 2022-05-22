@@ -1,6 +1,7 @@
 package storages
 
 import (
+	"context"
 	"fmt"
 	"testing"
 
@@ -53,7 +54,7 @@ func TestLinkStorage_Restore(t *testing.T) {
 			ls := LinkStorage{
 				storage: tt.fields.storage,
 			}
-			gotLink, err := ls.Restore(tt.args.id)
+			gotLink, err := ls.Restore(context.Background(), tt.args.id)
 			if !tt.wantErr(t, err, fmt.Sprintf("Restore(%v)", tt.args.id)) {
 				return
 			}
@@ -117,7 +118,7 @@ func TestLinkStorage_Store(t *testing.T) {
 			ls := LinkStorage{
 				storage: tt.fields.storage,
 			}
-			err := ls.Store(tt.args.user, tt.args.id, tt.args.link)
+			err := ls.Store(context.Background(), tt.args.user, tt.args.id, tt.args.link)
 			if !tt.wantErr(t, err, fmt.Sprintf("Store(%v)", tt.args.link)) {
 				return
 			}
