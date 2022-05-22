@@ -18,11 +18,11 @@ import (
 )
 
 func main() {
-	srv, repo, db := CreateServer()
-	Run(srv, repo, db)
+	srv, repo := CreateServer()
+	Run(srv, repo)
 }
 
-func CreateServer() (*http.Server, handlers.Repository, *sql.DB) {
+func CreateServer() (*http.Server, handlers.Repository) {
 	var (
 		srv  *http.Server
 		db   *sql.DB
@@ -40,7 +40,7 @@ func CreateServer() (*http.Server, handlers.Repository, *sql.DB) {
 
 	repo = chooseRepo(viper.GetString("file-storage-path"), db)
 	srv = server.NewServer(viper.GetString("base-url"), viper.GetString("server-address"), repo, db)
-	return srv, repo, db
+	return srv, repo
 }
 
 func chooseRepo(filename string, db *sql.DB) (repo handlers.Repository) {
@@ -66,7 +66,7 @@ func chooseRepo(filename string, db *sql.DB) (repo handlers.Repository) {
 	return storages.NewLinkStorage()
 }
 
-func Run(srv *http.Server, repo handlers.Repository, db *sql.DB) {
+func Run(srv *http.Server, repo handlers.Repository) {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
@@ -87,7 +87,7 @@ func Run(srv *http.Server, repo handlers.Repository, db *sql.DB) {
 			log.Printf("Caught an error due closing repository:%+v", err)
 		}
 
-		log.Println("Everything closed properly")
+		log.Println("Everything is closed properly")
 		cancel()
 	}()
 	if err := srv.Shutdown(ctx); err != nil {

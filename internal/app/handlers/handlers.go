@@ -62,7 +62,9 @@ func (s URLShortener) HandlePostShortenPlain(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	ctx := r.Context()
+	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
+	defer cancel()
+
 	user := midware.GetUserID(ctx)
 	shortenedURL, err := s.shorten(ctx, user, link)
 	if err != nil {
@@ -91,7 +93,9 @@ func (s URLShortener) HandlePostShortenJSON(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	ctx := r.Context()
+	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
+	defer cancel()
+
 	user := midware.GetUserID(ctx)
 	shortenedURL, err := s.shorten(ctx, user, req.URL)
 	if err != nil {
@@ -139,7 +143,10 @@ func (s URLShortener) createShortID(ctx context.Context) (id string, err error) 
 // HandleGet - ручка для открытия по короткой ссылке
 func (s URLShortener) HandleGet(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
-	u, err := s.linkRepo.Restore(r.Context(), id)
+	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
+	defer cancel()
+
+	u, err := s.linkRepo.Restore(ctx, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		return
@@ -150,7 +157,9 @@ func (s URLShortener) HandleGet(w http.ResponseWriter, r *http.Request) {
 
 // HandleGetUserURLsBucket - ручка для получения всех ссылок пользователя
 func (s URLShortener) HandleGetUserURLsBucket(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
+	defer cancel()
+
 	user := midware.GetUserID(ctx)
 	bucket := s.linkRepo.GetUserBucket(ctx, s.baseURL, user)
 	if len(bucket) == 0 {

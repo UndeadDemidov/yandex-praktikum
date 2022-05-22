@@ -3,12 +3,15 @@ package storages
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
+	"log"
 	"time"
 )
 
 const (
-	checkQuery = `SELECT count(1)
+	checkQuery = `SELECT COUNT(1)
 					FROM information_schema.tables
 				   WHERE table_schema = 'public'
 					 AND table_type = 'BASE TABLE'
@@ -21,6 +24,10 @@ const (
 						);
 						create unique index shortened_urls_id_uindex on shortened_urls (id);
 						create index shortened_urls_user_id on shortened_urls (user_id);`
+	isExistQuery    = `SELECT COUNT(1) FROM shortened_urls WHERE id=$1`
+	storeStatement  = `INSERT INTO shortened_urls (id, user_id, original_url) VALUES ($1, $2, $3);`
+	restoreQuery    = `SELECT original_url FROM shortened_urls WHERE id=$1`
+	userBucketQuery = `SELECT id, original_url FROM shortened_urls WHERE user_id=$1`
 )
 
 // DBStorage реализует хранение ссылок в файле.
@@ -65,18 +72,37 @@ func createDB(db *sql.DB) (err error) {
 }
 
 func (d DBStorage) IsExist(ctx context.Context, id string) bool {
-	//TODO implement me
-	panic("implement me")
+	var cnt int64
+	err := d.database.QueryRowContext(ctx, isExistQuery, id).Scan(&cnt)
+	if err != nil {
+		// после 10 попытке свалиться в генерации уникального ID
+		return true
+	}
+
+	if cnt != 0 {
+		return true
+	}
+	return false
 }
 
 func (d DBStorage) Store(ctx context.Context, user string, id string, link string) (err error) {
-	//TODO implement me
-	panic("implement me")
+	_, err = d.database.ExecContext(ctx, storeStatement, id, user, link)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
 
 func (d DBStorage) Restore(ctx context.Context, id string) (link string, err error) {
-	//TODO implement me
-	panic("implement me")
+	err = d.database.QueryRowContext(ctx, restoreQuery, id).Scan(&link)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", fmt.Errorf(ErrLinkNotFound, id)
+	}
+	if err != nil {
+		return "", err
+	}
+	return
 }
 
 func (d DBStorage) Close() error {
@@ -84,6 +110,39 @@ func (d DBStorage) Close() error {
 }
 
 func (d DBStorage) GetUserBucket(ctx context.Context, baseURL, user string) (bucket []handlers.BucketItem) {
-	//TODO implement me
-	panic("implement me")
+	rows, err := d.database.QueryContext(ctx, userBucketQuery, user)
+	if err != nil {
+		log.Println(err)
+		return []handlers.BucketItem{}
+	}
+	defer func() {
+		err := rows.Close()
+		if err != nil {
+			log.Println(err)
+		}
+	}()
+
+	bucket = make([]handlers.BucketItem, 0)
+	for rows.Next() {
+		var (
+			v  handlers.BucketItem
+			id string
+		)
+		err = rows.Scan(&id, &v.OriginalURL)
+		if err != nil {
+			log.Println(err)
+			return []handlers.BucketItem{}
+		}
+		v.ShortURL = fmt.Sprintf("%s%s", baseURL, id)
+
+		bucket = append(bucket, v)
+	}
+
+	err = rows.Err()
+	if err != nil {
+		log.Println(err)
+		return []handlers.BucketItem{}
+	}
+
+	return bucket
 }

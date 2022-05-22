@@ -98,7 +98,7 @@ func (f *FileStorage) Restore(_ context.Context, id string) (link string, err er
 	for {
 		alias, err := f.storageReader.Read()
 		if err != nil {
-			return "", err
+			return "", fmt.Errorf(ErrLinkNotFound, id)
 		}
 
 		if alias.Key == id {
