@@ -107,14 +107,14 @@ func (f *FileStorage) Restore(_ context.Context, id string) (link string, err er
 	}
 }
 
-func (f *FileStorage) GetUserBucket(_ context.Context, baseURL, user string) (bucket []handlers.BucketItem) {
+func (f *FileStorage) GetAllUserLinks(_ context.Context, user string) map[string]string {
 	f.mx.Lock()
 	defer f.mx.Unlock()
 
-	bucket = []handlers.BucketItem{}
+	m := map[string]string{}
 	_, err := f.storageReader.file.Seek(0, io.SeekStart)
 	if err != nil {
-		return []handlers.BucketItem{}
+		return map[string]string{}
 	}
 
 	scanner := bufio.NewScanner(f.storageReader.file)
@@ -126,20 +126,22 @@ func (f *FileStorage) GetUserBucket(_ context.Context, baseURL, user string) (bu
 			// Либо опять по всему файлу бежать с unmarshal
 			dec := json.NewDecoder(bytes.NewBufferString(txt))
 			if err := dec.Decode(&alias); err != nil {
-				return []handlers.BucketItem{}
+				return map[string]string{}
 			}
-			bucket = append(bucket, handlers.BucketItem{
-				ShortURL:    fmt.Sprintf("%s%s", baseURL, alias.Key),
-				OriginalURL: alias.URL,
-			})
+			m[alias.Key] = alias.URL
 		}
 	}
 
 	if err := scanner.Err(); err != nil {
-		return []handlers.BucketItem{}
+		return map[string]string{}
 	}
 
-	return bucket
+	return m
+}
+
+func (f *FileStorage) StoreBatch(ctx context.Context, user string, batch map[string]string) error {
+	//TODO implement me
+	panic("implement me")
 }
 
 // Close закрывает все файлы, открытых для записи и чтения

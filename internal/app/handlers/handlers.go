@@ -161,8 +161,8 @@ func (s URLShortener) HandleGetUserURLsBucket(w http.ResponseWriter, r *http.Req
 	defer cancel()
 
 	user := midware.GetUserID(ctx)
-	bucket := s.linkRepo.GetUserBucket(ctx, s.baseURL, user)
-	if len(bucket) == 0 {
+	urlsMap := s.linkRepo.GetAllUserLinks(ctx, user)
+	if len(urlsMap) == 0 {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
@@ -170,7 +170,7 @@ func (s URLShortener) HandleGetUserURLsBucket(w http.ResponseWriter, r *http.Req
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 
-	err := json.NewEncoder(w).Encode(&bucket)
+	err := json.NewEncoder(w).Encode(MapToBucket(s.baseURL, urlsMap))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -214,14 +214,9 @@ func (s URLShortener) HandleNotFound(w http.ResponseWriter, _ *http.Request) {
 // Используется для удобства тестирования и для дальнейшей легкой миграции на другой "движок".
 type Repository interface {
 	IsExist(ctx context.Context, id string) bool
-	Store(ctx context.Context, user string, id string, link string) (err error)
+	Store(ctx context.Context, user string, id string, link string) error
 	Restore(ctx context.Context, id string) (link string, err error)
 	Close() error
-	GetUserBucket(ctx context.Context, baseURL, user string) (bucket []BucketItem)
-}
-
-// BucketItem представляет собой структуру, в которой требуется сериализовать список ссылок
-type BucketItem struct {
-	ShortURL    string `json:"short_url"`
-	OriginalURL string `json:"original_url"`
+	GetAllUserLinks(ctx context.Context, user string) map[string]string
+	StoreBatch(ctx context.Context, user string, batch map[string]string) error
 }

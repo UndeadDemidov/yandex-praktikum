@@ -81,26 +81,24 @@ func (ls *LinkStorage) Restore(_ context.Context, id string) (link string, err e
 	return "", fmt.Errorf(ErrLinkNotFound, id)
 }
 
+func (ls *LinkStorage) GetAllUserLinks(_ context.Context, user string) map[string]string {
+	ls.mx.Lock()
+	defer ls.mx.Unlock()
+
+	ub, ok := ls.storage[user]
+	if !ok {
+		return map[string]string{}
+	}
+	return ub
+}
+
+func (ls *LinkStorage) StoreBatch(ctx context.Context, user string, batch map[string]string) (err error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 // Close ничего не делает, требуется только для совместимости с контрактом
 func (ls *LinkStorage) Close() error {
 	// Do nothing
 	return nil
-}
-
-func (ls *LinkStorage) GetUserBucket(_ context.Context, baseURL, user string) (bucket []handlers.BucketItem) {
-	ls.mx.Lock()
-	defer ls.mx.Unlock()
-
-	bucket = []handlers.BucketItem{}
-	ub, ok := ls.storage[user]
-	if !ok {
-		return bucket
-	}
-	for k, v := range ub {
-		bucket = append(bucket, handlers.BucketItem{
-			ShortURL:    fmt.Sprintf("%s%s", baseURL, k),
-			OriginalURL: v,
-		})
-	}
-	return bucket
 }

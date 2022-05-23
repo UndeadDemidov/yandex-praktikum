@@ -105,15 +105,11 @@ func (d DBStorage) Restore(ctx context.Context, id string) (link string, err err
 	return
 }
 
-func (d DBStorage) Close() error {
-	return d.database.Close()
-}
-
-func (d DBStorage) GetUserBucket(ctx context.Context, baseURL, user string) (bucket []handlers.BucketItem) {
+func (d DBStorage) GetAllUserLinks(ctx context.Context, user string) map[string]string {
 	rows, err := d.database.QueryContext(ctx, userBucketQuery, user)
 	if err != nil {
 		log.Println(err)
-		return []handlers.BucketItem{}
+		return map[string]string{}
 	}
 	defer func() {
 		err := rows.Close()
@@ -122,27 +118,34 @@ func (d DBStorage) GetUserBucket(ctx context.Context, baseURL, user string) (buc
 		}
 	}()
 
-	bucket = make([]handlers.BucketItem, 0)
+	m := map[string]string{}
 	for rows.Next() {
 		var (
-			v  handlers.BucketItem
-			id string
+			id          string
+			originalURL string
 		)
-		err = rows.Scan(&id, &v.OriginalURL)
+		err = rows.Scan(&id, &originalURL)
 		if err != nil {
 			log.Println(err)
-			return []handlers.BucketItem{}
+			return map[string]string{}
 		}
-		v.ShortURL = fmt.Sprintf("%s%s", baseURL, id)
-
-		bucket = append(bucket, v)
+		m[id] = originalURL
 	}
 
 	err = rows.Err()
 	if err != nil {
 		log.Println(err)
-		return []handlers.BucketItem{}
+		return map[string]string{}
 	}
 
-	return bucket
+	return m
+}
+
+func (d DBStorage) StoreBatch(ctx context.Context, user string, batch map[string]string) error {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (d DBStorage) Close() error {
+	return d.database.Close()
 }
