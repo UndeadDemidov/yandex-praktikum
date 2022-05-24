@@ -142,8 +142,30 @@ func (d DBStorage) GetAllUserLinks(ctx context.Context, user string) map[string]
 }
 
 func (d DBStorage) StoreBatch(ctx context.Context, user string, batch map[string]string) error {
-	//TODO implement me
-	panic("implement me")
+	// шаг 1 — объявляем транзакцию
+	tx, err := d.database.Begin()
+	if err != nil {
+		return err
+	}
+	// шаг 1.1 — если возникает ошибка, откатываем изменения
+	defer tx.Rollback()
+
+	// шаг 2 — готовим инструкцию
+	stmt, err := tx.PrepareContext(ctx, "INSERT INTO shortened_urls(id, user_id, original_url) VALUES($1,$2,$3)")
+	if err != nil {
+		return err
+	}
+	// шаг 2.1 — не забываем закрыть инструкцию, когда она больше не нужна
+	defer stmt.Close()
+
+	for k, v := range batch {
+		// шаг 3 — указываем, что каждый элемент будет добавлен в транзакцию
+		if _, err = stmt.ExecContext(ctx, k, user, v); err != nil {
+			return err
+		}
+	}
+	// шаг 4 — сохраняем изменения
+	return tx.Commit()
 }
 
 func (d DBStorage) Close() error {

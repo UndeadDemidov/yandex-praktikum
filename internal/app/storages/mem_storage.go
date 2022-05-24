@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
+	"golang.org/x/exp/maps"
 )
 
 const (
@@ -92,9 +93,16 @@ func (ls *LinkStorage) GetAllUserLinks(_ context.Context, user string) map[strin
 	return ub
 }
 
-func (ls *LinkStorage) StoreBatch(ctx context.Context, user string, batch map[string]string) (err error) {
-	//TODO implement me
-	panic("implement me")
+func (ls *LinkStorage) StoreBatch(_ context.Context, user string, batch map[string]string) error {
+	ls.mx.Lock()
+	defer ls.mx.Unlock()
+
+	_, ok := ls.storage[user]
+	if !ok {
+		ls.storage[user] = make(map[string]string)
+	}
+	maps.Copy(ls.storage[user], batch)
+	return nil
 }
 
 // Close ничего не делает, требуется только для совместимости с контрактом

@@ -76,12 +76,15 @@ func (f *FileStorage) Store(_ context.Context, user string, id string, link stri
 	f.mx.Lock()
 	defer f.mx.Unlock()
 
+	return f.store(user, id, link)
+}
+
+func (f *FileStorage) store(user string, id string, link string) error {
 	a := Alias{User: user, Key: id, URL: link}
 	err := f.storageWriter.Write(&a)
 	if err != nil {
 		return err
 	}
-
 	return nil
 }
 
@@ -139,9 +142,17 @@ func (f *FileStorage) GetAllUserLinks(_ context.Context, user string) map[string
 	return m
 }
 
-func (f *FileStorage) StoreBatch(ctx context.Context, user string, batch map[string]string) error {
-	//TODO implement me
-	panic("implement me")
+func (f *FileStorage) StoreBatch(_ context.Context, user string, batch map[string]string) error {
+	f.mx.Lock()
+	defer f.mx.Unlock()
+
+	for k, v := range batch {
+		err := f.store(user, k, v)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Close закрывает все файлы, открытых для записи и чтения
