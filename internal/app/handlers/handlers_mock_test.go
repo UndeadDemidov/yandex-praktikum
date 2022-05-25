@@ -3,7 +3,6 @@ package handlers
 import (
 	"context"
 	"errors"
-	"fmt"
 )
 
 const mockedID = "1111"
@@ -37,11 +36,10 @@ func (rm RepoMock) Close() error {
 	return nil
 }
 
-func (rm RepoMock) GetUserBucket(_ context.Context, _, _ string) (bucket []BucketItem) {
-	return []BucketItem{
-		{
-			ShortURL:    fmt.Sprintf("http://localhost:8080/%s", mockedID),
-			OriginalURL: rm.singleItemStorage,
-		},
-	}
+func (rm RepoMock) GetAllUserLinks(_ context.Context, _ string) map[string]string {
+	return map[string]string{mockedID: rm.singleItemStorage}
+}
+
+func (rm RepoMock) StoreBatch(_ context.Context, _ string, _ map[string]string) error {
+	return nil
 }
