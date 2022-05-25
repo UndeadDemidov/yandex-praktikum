@@ -27,6 +27,7 @@ func NewServer(baseURL string, addr string, repo handlers.Repository, db *sql.DB
 
 	r.Post("/", handler.HandlePostShortenPlain)
 	r.Post("/api/shorten", handler.HandlePostShortenJSON)
+	r.Post("/api/shorten/batch", handler.HandlePostShortenBatch)
 	r.Get("/{id}", handler.HandleGet)
 	r.Get("/api/user/urls", handler.HandleGetUserURLsBucket)
 	r.Get("/ping", handler.HeartBeat)

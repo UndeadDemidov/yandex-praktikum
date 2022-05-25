@@ -6,8 +6,8 @@ type URLShortenRequest struct {
 }
 
 type URLShortenCorrelatedRequest struct {
-	CorrelatedID string `json:"correlated_id"`
-	OriginalURL  string `json:"original_url"`
+	CorrelationID string `json:"correlation_id"`
+	OriginalURL   string `json:"original_url"`
 }
 
 type BatchRequest []URLShortenCorrelatedRequest

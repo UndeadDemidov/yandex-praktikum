@@ -31,8 +31,8 @@ func MapToBucket(baseURL string, m map[string]string) *[]BucketItem {
 }
 
 type URLShortenCorrelatedResponse struct {
-	CorrelatedID string `json:"correlated_id"`
-	OriginalURL  string `json:"original_url"`
+	CorrelationID string `json:"correlation_id"`
+	ShortURL      string `json:"short_url"`
 }
 
 type BatchResponse []URLShortenCorrelatedRequest

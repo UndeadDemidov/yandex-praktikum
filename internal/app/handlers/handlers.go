@@ -177,6 +177,68 @@ func (s URLShortener) HandleGetUserURLsBucket(w http.ResponseWriter, r *http.Req
 	}
 }
 
+// HandlePostShortenBatch - ручка для создания коротких ссылок пакетом
+// Оригинальные ссылки передаются через JSON Body
+// ToDo есть желание переписать на stream
+func (s URLShortener) HandlePostShortenBatch(w http.ResponseWriter, r *http.Request) {
+	var req []URLShortenCorrelatedRequest
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		http.Error(w, "proper JSON request is expected", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
+	defer cancel()
+
+	user := midware.GetUserID(ctx)
+	var resp []URLShortenCorrelatedResponse
+	resp, err = s.shortenBatch(ctx, user, req)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
+
+	err = json.NewEncoder(w).Encode(&resp)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func (s URLShortener) shortenBatch(ctx context.Context, user string, req []URLShortenCorrelatedRequest) (resp []URLShortenCorrelatedResponse, err error) {
+	if req == nil || len(req) == 0 {
+		return nil, errors.New("nothing to short")
+	}
+
+	batch := map[string]string{}
+	resp = make([]URLShortenCorrelatedResponse, 0, len(req))
+	for _, r := range req {
+		id, err := s.createShortID(ctx)
+		if err != nil {
+			// вообще то не очень здорово так делать
+			// лучше если просто continue - тогда из 100 ссылок сократиться 99,
+			// а не отстрелится весь батч
+			return nil, err
+		}
+		// ToDo Проверить что json корректный
+		resp = append(resp, URLShortenCorrelatedResponse{
+			CorrelationID: r.CorrelationID,
+			ShortURL:      id,
+		})
+		batch[id] = r.OriginalURL
+	}
+
+	err = s.linkRepo.StoreBatch(ctx, user, batch)
+	if err != nil {
+		return nil, err
+	}
+	return resp, nil
+}
+
 // HeartBeat - ручка для проверки, что подключение к БД живое
 func (s URLShortener) HeartBeat(w http.ResponseWriter, r *http.Request) {
 	if s.database == nil {
