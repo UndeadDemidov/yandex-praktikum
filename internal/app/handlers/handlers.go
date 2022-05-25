@@ -227,7 +227,7 @@ func (s URLShortener) shortenBatch(ctx context.Context, user string, req []URLSh
 		// ToDo Проверить что json корректный
 		resp = append(resp, URLShortenCorrelatedResponse{
 			CorrelationID: r.CorrelationID,
-			ShortURL:      id,
+			ShortURL:      fmt.Sprintf("%s%s", s.baseURL, id),
 		})
 		batch[id] = r.OriginalURL
 	}
