@@ -6,7 +6,6 @@ import (
 	"sync"
 
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
-	"golang.org/x/exp/maps"
 )
 
 const (
@@ -101,7 +100,12 @@ func (ls *LinkStorage) StoreBatch(_ context.Context, user string, batch map[stri
 	if !ok {
 		ls.storage[user] = make(map[string]string)
 	}
-	maps.Copy(ls.storage[user], batch)
+	// требуется go 1.18, а в yandex_practicum видимо еще не обновили go
+	// maps.Copy(ls.storage[user], batch)
+	for k, v := range batch {
+		ls.storage[user][k] = v
+	}
+
 	return nil
 }
 
