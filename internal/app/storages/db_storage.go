@@ -23,9 +23,23 @@ const (
 						    original_url VARCHAR not null
 						);
 						create unique index shortened_urls_id_uindex on shortened_urls (id);
+						create unique index shortened_urls_original_url_uindex on shortened_urls (original_url);
 						create index shortened_urls_user_id on shortened_urls (user_id);`
-	isExistQuery    = `SELECT COUNT(1) FROM shortened_urls WHERE id=$1`
-	storeStatement  = `INSERT INTO shortened_urls (id, user_id, original_url) VALUES ($1, $2, $3);`
+	isExistQuery   = `SELECT COUNT(1) FROM shortened_urls WHERE id=$1`
+	storeStatement = `INSERT INTO shortened_urls (id, user_id, original_url) VALUES ($1, $2, $3);`
+	// Как говорит великий Том Кайт - если можно сделать одним SQL statement - сделай это!
+	// Если original_url уже есть, то возвращается его ID (независимо от user_id),
+	// Если
+	storeQuery = `WITH inserted_rows AS (
+						INSERT INTO shortened_urls (id, user_id, original_url)
+        				VALUES ($1, $2, $3)
+        				ON CONFLICT (original_url) DO NOTHING
+						RETURNING id
+					  )
+						SELECT id
+						FROM shortened_urls
+   						 WHERE NOT exists (SELECT 1 FROM inserted_rows)
+   						   AND original_url=$3;`
 	restoreQuery    = `SELECT original_url FROM shortened_urls WHERE id=$1`
 	userBucketQuery = `SELECT id, original_url FROM shortened_urls WHERE user_id=$1`
 )
@@ -40,7 +54,8 @@ var _ handlers.Repository = (*DBStorage)(nil)
 
 func NewDBStorage(db *sql.DB) (st DBStorage, err error) {
 	st = DBStorage{database: db}
-
+	// ToDo - удали меня!
+	fmt.Println(storeQuery)
 	err = createDB(db)
 	if err != nil {
 		return DBStorage{}, err
