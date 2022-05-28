@@ -54,8 +54,6 @@ var _ handlers.Repository = (*DBStorage)(nil)
 
 func NewDBStorage(db *sql.DB) (st DBStorage, err error) {
 	st = DBStorage{database: db}
-	// ToDo - удали меня!
-	fmt.Println(storeQuery)
 	err = createDB(db)
 	if err != nil {
 		return DBStorage{}, err
@@ -101,12 +99,17 @@ func (d DBStorage) IsExist(ctx context.Context, id string) bool {
 }
 
 func (d DBStorage) Store(ctx context.Context, user string, id string, link string) (err error) {
-	_, err = d.database.ExecContext(ctx, storeStatement, id, user, link)
+	var actualID string
+	err = d.database.QueryRowContext(ctx, storeQuery, id, user, link).Scan(&actualID)
+	if errors.Is(err, sql.ErrNoRows) {
+		// Если пустой сет записей, то успешно вставили запись
+		return nil
+	}
 	if err != nil {
 		return err
 	}
 
-	return nil
+	return handlers.NewUniqueIDViolatedError(errors.New("link is in database already"), map[string]string{id: actualID})
 }
 
 func (d DBStorage) Restore(ctx context.Context, id string) (link string, err error) {
@@ -166,7 +169,7 @@ func (d DBStorage) StoreBatch(ctx context.Context, user string, batch map[string
 	defer tx.Rollback()
 
 	// шаг 2 — готовим инструкцию
-	stmt, err := tx.PrepareContext(ctx, "INSERT INTO shortened_urls(id, user_id, original_url) VALUES($1,$2,$3)")
+	stmt, err := tx.PrepareContext(ctx, storeStatement)
 	if err != nil {
 		return err
 	}

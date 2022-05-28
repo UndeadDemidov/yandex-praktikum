@@ -17,7 +17,9 @@ import (
 	gonanoid "github.com/matoous/go-nanoid/v2"
 )
 
-var ErrUnableCreateShortID = errors.New("couldn't create unique ID in 10 tries")
+var (
+	ErrUnableCreateShortID = errors.New("couldn't create unique ID in 10 tries")
+)
 
 // URLShortener - реализация интерфейса http.Handler
 // Согласно заданию 1-го инкремента
@@ -65,13 +67,21 @@ func (s URLShortener) HandlePostShortenPlain(w http.ResponseWriter, r *http.Requ
 	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
 	defer cancel()
 
+	w.Header().Set("Content-Type", "application/json")
+
 	user := midware.GetUserID(ctx)
+	var e *UniqueIDViolatedError
 	shortenedURL, err := s.shorten(ctx, user, link)
-	if err != nil {
+	switch {
+	case errors.As(err, &e):
+		w.WriteHeader(http.StatusConflict)
+	case err != nil:
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	default:
+		w.WriteHeader(http.StatusCreated)
 	}
-	w.WriteHeader(http.StatusCreated)
+
 	_, err = w.Write([]byte(shortenedURL))
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -96,14 +106,21 @@ func (s URLShortener) HandlePostShortenJSON(w http.ResponseWriter, r *http.Reque
 	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
 	defer cancel()
 
+	w.Header().Set("Content-Type", "application/json")
+
 	user := midware.GetUserID(ctx)
+	var e *UniqueIDViolatedError
 	shortenedURL, err := s.shorten(ctx, user, req.URL)
-	if err != nil {
+	switch {
+	case errors.As(err, &e):
+		w.WriteHeader(http.StatusConflict)
+	case err != nil:
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	default:
+		w.WriteHeader(http.StatusCreated)
 	}
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
+
 	resp := URLShortenResponse{Result: shortenedURL}
 	err = json.NewEncoder(w).Encode(&resp)
 	if err != nil {
@@ -119,11 +136,25 @@ func (s URLShortener) shorten(ctx context.Context, user string, originalURL stri
 		return "", err
 	}
 	err = s.linkRepo.Store(ctx, user, id, originalURL)
-	if err != nil {
+
+	var e *UniqueIDViolatedError
+	switch {
+	// Честно говоря вообще не прозрачно логически.
+	// То есть после As переменной e присваивается err, то есть идет cast
+	// Выглядит как костыль для непосвященных
+	case errors.As(err, &e):
+		actualID, ok := e.ActualIDs[id]
+		if !ok {
+			return "", err
+		}
+		shortenedURL = fmt.Sprintf("%s%s", s.baseURL, actualID)
+		return shortenedURL, err
+	case err != nil:
 		return "", err
+	default:
+		shortenedURL = fmt.Sprintf("%s%s", s.baseURL, id)
+		return shortenedURL, nil
 	}
-	shortenedURL = fmt.Sprintf("%s%s", s.baseURL, id)
-	return shortenedURL, nil
 }
 
 // createShortID создает короткий ID с проверкой на валидность
@@ -179,7 +210,7 @@ func (s URLShortener) HandleGetUserURLsBucket(w http.ResponseWriter, r *http.Req
 
 // HandlePostShortenBatch - ручка для создания коротких ссылок пакетом
 // Оригинальные ссылки передаются через JSON Body
-// ToDo есть желание переписать на stream
+// ToDo есть желание переписать на stream. но задание с ошибкой все сильно усложняет
 func (s URLShortener) HandlePostShortenBatch(w http.ResponseWriter, r *http.Request) {
 	var req []URLShortenCorrelatedRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
