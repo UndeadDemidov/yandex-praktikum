@@ -6,12 +6,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
 	"io"
 	"os"
 	"strings"
 	"sync"
 
-	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
 )
 
@@ -45,12 +45,9 @@ func NewFileStorage(filename string) (fs *FileStorage, err error) {
 	return fs, nil
 }
 
-// IsExist проверяет наличие в файле указанного ID
+// isExist проверяет наличие в файле указанного ID
 // Если такой ID входит как подстрока в ссылку, то результат будет такой же, как если бы был найден ID
-func (f *FileStorage) IsExist(_ context.Context, id string) bool {
-	f.mx.Lock()
-	defer f.mx.Unlock()
-
+func (f *FileStorage) isExist(_ context.Context, id string) bool {
 	_, err := f.storageReader.file.Seek(0, io.SeekStart)
 	if err != nil {
 		return false
@@ -72,11 +69,21 @@ func (f *FileStorage) IsExist(_ context.Context, id string) bool {
 }
 
 // Store - сохраняет ID и ссылку в формате JSON во внешнем файле
-func (f *FileStorage) Store(_ context.Context, user string, id string, link string) error {
+func (f *FileStorage) Store(ctx context.Context, user string, link string) (id string, err error) {
 	f.mx.Lock()
 	defer f.mx.Unlock()
 
-	return f.store(user, id, link)
+	id, err = createShortID(ctx, f.isExist)
+	if err != nil {
+		return "", err
+	}
+
+	err = f.store(user, id, link)
+	if err != nil {
+		return "", err
+	}
+
+	return id, err
 }
 
 func (f *FileStorage) store(user string, id string, link string) error {

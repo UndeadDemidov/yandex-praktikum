@@ -18,8 +18,8 @@ import (
 )
 
 var (
-	ErrUnableCreateShortID = errors.New("couldn't create unique ID in 10 tries")
-	ErrEmptyBatchToShort   = errors.New("nothing to short")
+	ErrLinkIsAlreadyShortened = errors.New("link is already shortened")
+	ErrEmptyBatchToShort      = errors.New("nothing to short")
 )
 
 // URLShortener - реализация интерфейса http.Handler
@@ -71,10 +71,9 @@ func (s URLShortener) HandlePostShortenPlain(w http.ResponseWriter, r *http.Requ
 	w.Header().Set("Content-Type", "application/json")
 
 	user := midware.GetUserID(ctx)
-	var e *UniqueIDViolatedError
 	shortenedURL, err := s.shorten(ctx, user, link)
 	switch {
-	case errors.As(err, &e):
+	case errors.Is(err, ErrLinkIsAlreadyShortened):
 		w.WriteHeader(http.StatusConflict)
 	case err != nil:
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -110,10 +109,9 @@ func (s URLShortener) HandlePostShortenJSON(w http.ResponseWriter, r *http.Reque
 	w.Header().Set("Content-Type", "application/json")
 
 	user := midware.GetUserID(ctx)
-	var e *UniqueIDViolatedError
 	shortenedURL, err := s.shorten(ctx, user, req.URL)
 	switch {
-	case errors.As(err, &e):
+	case errors.Is(err, ErrLinkIsAlreadyShortened):
 		w.WriteHeader(http.StatusConflict)
 	case err != nil:
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -132,44 +130,17 @@ func (s URLShortener) HandlePostShortenJSON(w http.ResponseWriter, r *http.Reque
 
 // shorten возвращает короткую ссылку в ответ на оригинальную
 func (s URLShortener) shorten(ctx context.Context, user string, originalURL string) (shortenedURL string, err error) {
-	id, err := s.createShortID(ctx)
-	if err != nil {
-		return "", err
+	var id string
+	id, err = s.linkRepo.Store(ctx, user, originalURL)
+	if err == nil || errors.Is(err, ErrLinkIsAlreadyShortened) {
+		return fmt.Sprintf("%s%s", s.baseURL, id), err
 	}
-	err = s.linkRepo.Store(ctx, user, id, originalURL)
-
-	var e *UniqueIDViolatedError
-	switch {
-	// Честно говоря вообще не прозрачно логически.
-	// То есть после As переменной e присваивается err, то есть идет cast
-	// Выглядит как костыль для непосвященных
-	case errors.As(err, &e):
-		actualID, ok := e.ActualIDs[id]
-		if !ok {
-			return "", err
-		}
-		shortenedURL = fmt.Sprintf("%s%s", s.baseURL, actualID)
-		return shortenedURL, err
-	case err != nil:
-		return "", err
-	default:
-		shortenedURL = fmt.Sprintf("%s%s", s.baseURL, id)
-		return shortenedURL, nil
-	}
+	return "", err
 }
 
 // createShortID создает короткий ID с проверкой на валидность
-func (s URLShortener) createShortID(ctx context.Context) (id string, err error) {
-	for i := 0; i < 10; i++ {
-		id, err = gonanoid.New(8)
-		if err != nil {
-			return "", err
-		}
-		if !s.linkRepo.IsExist(ctx, id) {
-			return id, nil
-		}
-	}
-	return "", ErrUnableCreateShortID
+func (s URLShortener) createShortID() (id string, err error) {
+	return gonanoid.New(8)
 }
 
 // HandleGet - ручка для открытия по короткой ссылке
@@ -250,7 +221,7 @@ func (s URLShortener) shortenBatch(ctx context.Context, user string, req []URLSh
 	batch := map[string]string{}
 	resp = make([]URLShortenCorrelatedResponse, 0, len(req))
 	for _, r := range req {
-		id, err := s.createShortID(ctx)
+		id, err := s.createShortID()
 		if err != nil {
 			// Вообще-то не очень здорово так делать
 			// лучше если просто continue - тогда из 100 ссылок сократиться 99,
@@ -317,8 +288,8 @@ func (s URLShortener) HandleNotFound(w http.ResponseWriter, _ *http.Request) {
 // Repository описывает контракт работы с хранилищем.
 // Используется для удобства тестирования и для дальнейшей легкой миграции на другой "движок".
 type Repository interface {
-	IsExist(ctx context.Context, id string) bool
-	Store(ctx context.Context, user string, id string, link string) error
+	// IsExist(ctx context.Context, id string) bool
+	Store(ctx context.Context, user string, link string) (id string, err error)
 	Restore(ctx context.Context, id string) (link string, err error)
 	Close() error
 	GetAllUserLinks(ctx context.Context, user string) map[string]string

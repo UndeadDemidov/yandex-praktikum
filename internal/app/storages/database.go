@@ -88,7 +88,7 @@ func createDB(db *sql.DB) (err error) {
 }
 
 // IsExist проверяет наличие id в базе
-func (d DBStorage) IsExist(ctx context.Context, id string) bool {
+func (d DBStorage) isExist(ctx context.Context, id string) bool {
 	var cnt int64
 	err := d.database.QueryRowContext(ctx, isExistQuery, id).Scan(&cnt)
 	if err != nil {
@@ -103,22 +103,27 @@ func (d DBStorage) IsExist(ctx context.Context, id string) bool {
 }
 
 // Store сохраняет ссылку в хранилище с указанным id. В случае конфликта c уже ранее сохраненным link
-// возвращает ошибку UniqueIDViolatedError содержащую map[id]actual_id
-// Кстати, тот факт, что интерфейс Repository указан в пакете handlers, то и ошибка тоже описана там,
-// чтобы не было циклических ссылок пакетов storages и handlers друг на друга.
-// Если Repository объявить тут и перенести сюда же реализацию ошибки, то разбивка на пакеты будет более чистой.
-func (d DBStorage) Store(ctx context.Context, user string, id string, link string) (err error) {
+// возвращает ошибку handlers.ErrLinkIsAlreadyShortened и id с раннего сохранения.
+// Вообще это не очень чистая реализация в Go, потому что в случае ошибки прозрачней указывать id пустой.
+// Или я не прав - и для Go так нормально???
+// ToDo можно сделать чище переместив id в возвращаемый параметр: Store(ctx context.Context, user string, link string, id *string) error
+func (d DBStorage) Store(ctx context.Context, user string, link string) (id string, err error) {
+	id, err = createShortID(ctx, d.isExist)
+	if err != nil {
+		return "", err
+	}
+
 	var actualID string
 	err = d.database.QueryRowContext(ctx, storeQuery, id, user, link).Scan(&actualID)
 	if errors.Is(err, sql.ErrNoRows) {
 		// Если пустой сет записей, то успешно вставили запись
-		return nil
+		return id, nil
 	}
 	if err != nil {
-		return err
+		return "", err
 	}
 
-	return handlers.NewUniqueIDViolatedError(errors.New("link is in database already"), map[string]string{id: actualID})
+	return actualID, handlers.ErrLinkIsAlreadyShortened
 }
 
 // Restore возвращает исходную ссылку по переданному короткому ID
