@@ -241,7 +241,7 @@ func (s URLShortener) HandlePostShortenBatch(w http.ResponseWriter, r *http.Requ
 }
 
 func (s URLShortener) shortenBatch(ctx context.Context, user string, req []URLShortenCorrelatedRequest) (resp []URLShortenCorrelatedResponse, err error) {
-	if req == nil || len(req) == 0 {
+	if len(req) == 0 {
 		return nil, errors.New("nothing to short")
 	}
 
@@ -255,7 +255,6 @@ func (s URLShortener) shortenBatch(ctx context.Context, user string, req []URLSh
 			// а не отстрелится весь батч
 			return nil, err
 		}
-		// ToDo Проверить что json корректный
 		resp = append(resp, URLShortenCorrelatedResponse{
 			CorrelationID: r.CorrelationID,
 			ShortURL:      fmt.Sprintf("%s%s", s.baseURL, id),
