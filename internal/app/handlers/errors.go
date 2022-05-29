@@ -2,6 +2,8 @@ package handlers
 
 import "fmt"
 
+// UniqueIDViolatedError ошибка позволяющая передавать map[id]actual_id для последующей замены.
+// map делал на вырост, чтобы сделать обновление для пакетной обработки. Но не осилил из-за CorrelationID
 type UniqueIDViolatedError struct {
 	ActualIDs map[string]string
 	Err       error

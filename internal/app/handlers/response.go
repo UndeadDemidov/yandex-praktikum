@@ -19,6 +19,7 @@ type BucketItem struct {
 	OriginalURL string `json:"original_url"`
 }
 
+// MapToBucket создает корзину ссылок из `map[string]string`
 func MapToBucket(baseURL string, m map[string]string) *[]BucketItem {
 	bucket := make([]BucketItem, 0, len(m))
 	for k, v := range m {
@@ -30,9 +31,14 @@ func MapToBucket(baseURL string, m map[string]string) *[]BucketItem {
 	return &bucket
 }
 
+// URLShortenCorrelatedResponse представляет собой структуру, в которой требуется сериализовать список ссылок
+//// [
+////   {
+////     "correlation_id": "4444",
+////     "short_url": "https://..."
+////   }, ...
+//// ]
 type URLShortenCorrelatedResponse struct {
 	CorrelationID string `json:"correlation_id"`
 	ShortURL      string `json:"short_url"`
 }
-
-type BatchResponse []URLShortenCorrelatedRequest

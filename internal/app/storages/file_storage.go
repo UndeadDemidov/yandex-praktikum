@@ -110,6 +110,7 @@ func (f *FileStorage) Restore(_ context.Context, id string) (link string, err er
 	}
 }
 
+// GetAllUserLinks возвращает map[id]link ранее сокращенных ссылок указанным пользователем
 func (f *FileStorage) GetAllUserLinks(_ context.Context, user string) map[string]string {
 	f.mx.Lock()
 	defer f.mx.Unlock()
@@ -142,6 +143,7 @@ func (f *FileStorage) GetAllUserLinks(_ context.Context, user string) map[string
 	return m
 }
 
+// StoreBatch сохраняет пакет ссылок из map[id]link
 func (f *FileStorage) StoreBatch(_ context.Context, user string, batch map[string]string) error {
 	f.mx.Lock()
 	defer f.mx.Unlock()

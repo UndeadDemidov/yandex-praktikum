@@ -22,6 +22,8 @@ func main() {
 	Run(srv, repo)
 }
 
+// CreateServer создает сервер и возвращает его и репозиторий.
+// Можно заменить параметры на глобальные переменные, вроде как от этого ничего плохого не будет.
 func CreateServer() (*http.Server, handlers.Repository) {
 	var (
 		srv  *http.Server
@@ -43,6 +45,7 @@ func CreateServer() (*http.Server, handlers.Repository) {
 	return srv, repo
 }
 
+// chooseRepo возвращает сервер в зависимости от того, какие параметры были переданы
 func chooseRepo(filename string, db *sql.DB) (repo handlers.Repository) {
 	var err error
 
@@ -66,6 +69,7 @@ func chooseRepo(filename string, db *sql.DB) (repo handlers.Repository) {
 	return storages.NewLinkStorage()
 }
 
+// Run запускает сервер с указанным репозиторием и реализуем graceful shutdown
 func Run(srv *http.Server, repo handlers.Repository) {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()

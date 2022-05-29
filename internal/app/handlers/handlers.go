@@ -19,6 +19,7 @@ import (
 
 var (
 	ErrUnableCreateShortID = errors.New("couldn't create unique ID in 10 tries")
+	ErrEmptyBatchToShort   = errors.New("nothing to short")
 )
 
 // URLShortener - реализация интерфейса http.Handler
@@ -240,9 +241,10 @@ func (s URLShortener) HandlePostShortenBatch(w http.ResponseWriter, r *http.Requ
 	}
 }
 
+// shortenBatch производит сокращение ссылок пакетом и возвращает слайс сокращенных ссылок
 func (s URLShortener) shortenBatch(ctx context.Context, user string, req []URLShortenCorrelatedRequest) (resp []URLShortenCorrelatedResponse, err error) {
 	if len(req) == 0 {
-		return nil, errors.New("nothing to short")
+		return nil, ErrEmptyBatchToShort
 	}
 
 	batch := map[string]string{}
@@ -250,11 +252,21 @@ func (s URLShortener) shortenBatch(ctx context.Context, user string, req []URLSh
 	for _, r := range req {
 		id, err := s.createShortID(ctx)
 		if err != nil {
-			// вообще то не очень здорово так делать
+			// Вообще-то не очень здорово так делать
 			// лучше если просто continue - тогда из 100 ссылок сократиться 99,
 			// а не отстрелится весь батч
 			return nil, err
 		}
+		// Честно говоря, если бы не этот CorrelationID, то можно было бы и конфликт пакетной обработкой разбирать.
+		// И с ним можно реализовать, но реализация получается чудовищно кривой и непрозрачной.
+		// Например, в StoreBatch надо передавать CorrelationID, чтобы он на него выдавал ActualID.
+		// И далее производить замену.
+		// Если генерацию id перенести в Repository, то тогда опять же, надо передавать correlation_id,
+		// а это нарушает чистоту слоя Repository
+		// В общем формально задание выполнение, но CorrelationID - провоцирует кривую архитектуру.
+		// Нормальную архитектуру за 4 дня раздумий я не нашел, хотя какие только идеи не пытался реализовать.
+		// Из самого разумного - добавлять baseURL в конце отдельным циклом. Получается дополнительных 2 цикла,
+		// что тоже выглядит как кривая архитектура по кол-ву сравнений.
 		resp = append(resp, URLShortenCorrelatedResponse{
 			CorrelationID: r.CorrelationID,
 			ShortURL:      fmt.Sprintf("%s%s", s.baseURL, id),

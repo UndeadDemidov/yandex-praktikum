@@ -5,9 +5,10 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
 	"log"
 	"time"
+
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
 )
 
 const (
@@ -52,15 +53,17 @@ type DBStorage struct {
 
 var _ handlers.Repository = (*DBStorage)(nil)
 
-func NewDBStorage(db *sql.DB) (st DBStorage, err error) {
-	st = DBStorage{database: db}
+// NewDBStorage cоздает и возвращает экземпляр DBStorage
+func NewDBStorage(db *sql.DB) (st *DBStorage, err error) {
+	st = &DBStorage{database: db}
 	err = createDB(db)
 	if err != nil {
-		return DBStorage{}, err
+		return &DBStorage{}, err
 	}
 	return st, nil
 }
 
+// createDB проверяет, есть ли уже необходимая структура БД и создает ее, если нет
 func createDB(db *sql.DB) (err error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
 	defer cancel()
@@ -84,6 +87,7 @@ func createDB(db *sql.DB) (err error) {
 	return nil
 }
 
+// IsExist проверяет наличие id в базе
 func (d DBStorage) IsExist(ctx context.Context, id string) bool {
 	var cnt int64
 	err := d.database.QueryRowContext(ctx, isExistQuery, id).Scan(&cnt)
@@ -98,6 +102,11 @@ func (d DBStorage) IsExist(ctx context.Context, id string) bool {
 	return false
 }
 
+// Store сохраняет ссылку в хранилище с указанным id. В случае конфликта c уже ранее сохраненным link
+// возвращает ошибку UniqueIDViolatedError содержащую map[id]actual_id
+// Кстати, тот факт, что интерфейс Repository указан в пакете handlers, то и ошибка тоже описана там,
+// чтобы не было циклических ссылок пакетов storages и handlers друг на друга.
+// Если Repository объявить тут и перенести сюда же реализацию ошибки, то разбивка на пакеты будет более чистой.
 func (d DBStorage) Store(ctx context.Context, user string, id string, link string) (err error) {
 	var actualID string
 	err = d.database.QueryRowContext(ctx, storeQuery, id, user, link).Scan(&actualID)
@@ -112,6 +121,7 @@ func (d DBStorage) Store(ctx context.Context, user string, id string, link strin
 	return handlers.NewUniqueIDViolatedError(errors.New("link is in database already"), map[string]string{id: actualID})
 }
 
+// Restore возвращает исходную ссылку по переданному короткому ID
 func (d DBStorage) Restore(ctx context.Context, id string) (link string, err error) {
 	err = d.database.QueryRowContext(ctx, restoreQuery, id).Scan(&link)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -123,6 +133,7 @@ func (d DBStorage) Restore(ctx context.Context, id string) (link string, err err
 	return
 }
 
+// GetAllUserLinks возвращает map[id]link ранее сокращенных ссылок указанным пользователем
 func (d DBStorage) GetAllUserLinks(ctx context.Context, user string) map[string]string {
 	rows, err := d.database.QueryContext(ctx, userBucketQuery, user)
 	if err != nil {
@@ -159,6 +170,7 @@ func (d DBStorage) GetAllUserLinks(ctx context.Context, user string) map[string]
 	return m
 }
 
+// StoreBatch сохраняет пакет ссылок из map[id]link
 func (d DBStorage) StoreBatch(ctx context.Context, user string, batch map[string]string) error {
 	// шаг 1 — объявляем транзакцию
 	tx, err := d.database.Begin()
@@ -186,6 +198,7 @@ func (d DBStorage) StoreBatch(ctx context.Context, user string, batch map[string
 	return tx.Commit()
 }
 
+// Close закрывает базу данных
 func (d DBStorage) Close() error {
 	return d.database.Close()
 }

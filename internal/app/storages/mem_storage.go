@@ -49,7 +49,7 @@ func (ls *LinkStorage) isExist(id string) bool {
 	return false
 }
 
-// Store сохраняет ссылку в хранилище и возвращает короткий ID
+// Store сохраняет ссылку в хранилище с указанным id
 func (ls *LinkStorage) Store(_ context.Context, user string, id string, link string) (err error) {
 	ls.mx.Lock()
 	defer ls.mx.Unlock()
@@ -81,6 +81,7 @@ func (ls *LinkStorage) Restore(_ context.Context, id string) (link string, err e
 	return "", fmt.Errorf(ErrLinkNotFound, id)
 }
 
+// GetAllUserLinks возвращает map[id]link ранее сокращенных ссылок указанным пользователем
 func (ls *LinkStorage) GetAllUserLinks(_ context.Context, user string) map[string]string {
 	ls.mx.Lock()
 	defer ls.mx.Unlock()
@@ -92,6 +93,7 @@ func (ls *LinkStorage) GetAllUserLinks(_ context.Context, user string) map[strin
 	return ub
 }
 
+// StoreBatch сохраняет пакет ссылок из map[id]link
 func (ls *LinkStorage) StoreBatch(_ context.Context, user string, batch map[string]string) error {
 	ls.mx.Lock()
 	defer ls.mx.Unlock()
