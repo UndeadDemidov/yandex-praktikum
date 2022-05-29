@@ -14,7 +14,6 @@ import (
 	midware "github.com/UndeadDemidov/yandex-praktikum/internal/app/middleware"
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
 	"github.com/go-chi/chi/v5"
-	gonanoid "github.com/matoous/go-nanoid/v2"
 	"github.com/rs/zerolog/log"
 )
 
@@ -22,7 +21,6 @@ var (
 	ErrLinkIsAlreadyShortened = errors.New("link is already shortened")
 	ErrEmptyBatchToShort      = errors.New("nothing to short")
 	ErrDBIsNotInitialized     = errors.New("db is not initialized")
-	//ErrLinkNotProvided        = errors.New("The link is not provided")
 )
 
 // URLShortener - реализация интерфейса http.Handler
@@ -141,11 +139,6 @@ func (s URLShortener) shorten(ctx context.Context, user string, originalURL stri
 		return fmt.Sprintf("%s%s", s.baseURL, id), err
 	}
 	return "", err
-}
-
-// createShortID создает короткий ID с проверкой на валидность
-func (s URLShortener) createShortID() (id string, err error) {
-	return gonanoid.New(8)
 }
 
 // HandleGet - ручка для открытия по короткой ссылке

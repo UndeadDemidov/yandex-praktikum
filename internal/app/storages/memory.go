@@ -49,8 +49,8 @@ func (ms *MemoryStorage) Store(ctx context.Context, user string, link string) (i
 
 // isExist проверяет наличие id в сторадже
 func (ms *MemoryStorage) isExist(_ context.Context, id string) bool {
-	for _, m := range ms.storage {
-		_, ok := m[id]
+	for _, user := range ms.storage {
+		_, ok := user[id]
 		if ok {
 			return true
 		}

@@ -14,7 +14,8 @@ var (
 // createShortID создает короткий ID с проверкой на валидность
 func createShortID(ctx context.Context, isExist func(context.Context, string) bool) (id string, err error) {
 	for i := 0; i < 10; i++ {
-		if !isExist(ctx, utils.NewUniqueID()) {
+		id = utils.NewUniqueID()
+		if !isExist(ctx, id) {
 			return id, nil
 		}
 	}
