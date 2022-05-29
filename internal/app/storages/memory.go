@@ -85,8 +85,8 @@ func (ms *MemoryStorage) GetAllUserLinks(_ context.Context, user string) map[str
 	return ub
 }
 
-// StoreBatch сохраняет пакет ссылок из map[id]link
-func (ms *MemoryStorage) StoreBatch(_ context.Context, user string, batch map[string]string) error {
+// StoreBatch сохраняет пакет ссылок из map[correlation_id]original_link и возвращает map[correlation_id]short_link
+func (ms *MemoryStorage) StoreBatch(ctx context.Context, user string, batchIn map[string]string) (batchOut map[string]string, err error) {
 	ms.mx.Lock()
 	defer ms.mx.Unlock()
 
@@ -94,13 +94,21 @@ func (ms *MemoryStorage) StoreBatch(_ context.Context, user string, batch map[st
 	if !ok {
 		ms.storage[user] = make(map[string]string)
 	}
+
+	batchOut = make(map[string]string)
+	var id string
 	// требуется go 1.18, а в yandex_practicum видимо еще не обновили go
 	// maps.Copy(ms.storage[user], batch)
-	for k, v := range batch {
-		ms.storage[user][k] = v
+	for corrID, link := range batchIn {
+		id, err = createShortID(ctx, ms.isExist)
+		if err != nil {
+			return nil, err
+		}
+		ms.storage[user][id] = link
+		batchOut[corrID] = id
 	}
 
-	return nil
+	return batchOut, nil
 }
 
 // Close ничего не делает, требуется только для совместимости с контрактом

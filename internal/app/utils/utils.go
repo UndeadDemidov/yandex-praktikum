@@ -1,6 +1,7 @@
 package utils
 
 import (
+	gonanoid "github.com/matoous/go-nanoid/v2"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -30,4 +31,13 @@ func CheckFilename(filename string) (err error) {
 	}
 
 	return err
+}
+
+func NewUniqueID() (id string) {
+	var err error
+	id, err = gonanoid.New(8)
+	if err != nil {
+		panic(err)
+	}
+	return id
 }

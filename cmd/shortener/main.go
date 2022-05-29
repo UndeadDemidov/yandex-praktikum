@@ -3,7 +3,7 @@ package main
 import (
 	"context"
 	"database/sql"
-	"log"
+	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
@@ -14,10 +14,14 @@ import (
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/server"
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/storages"
 	_ "github.com/lib/pq"
+	"github.com/rs/zerolog"
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 )
 
 func main() {
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 	srv, repo := CreateServer()
 	Run(srv, repo)
 }
@@ -52,7 +56,7 @@ func chooseRepo(filename string, db *sql.DB) (repo handlers.Repository) {
 	if db != nil {
 		repo, err = storages.NewDBStorage(db)
 		if err == nil {
-			log.Print("In database storage will be used")
+			log.Info().Msg("In database storage will be used")
 			return repo
 		}
 	}
@@ -60,12 +64,12 @@ func chooseRepo(filename string, db *sql.DB) (repo handlers.Repository) {
 	if len(filename) != 0 {
 		repo, err = storages.NewFileStorage(filename)
 		if err == nil {
-			log.Print("In file storage will be used")
+			log.Info().Msg("In file storage will be used")
 			return repo
 		}
 	}
 
-	log.Print("In memory storage will be used")
+	log.Info().Msg("In memory storage will be used")
 	return storages.NewLinkStorage()
 }
 
@@ -76,27 +80,27 @@ func Run(srv *http.Server, repo handlers.Repository) {
 
 	go func() {
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen: %+v\n", err)
+			log.Fatal().Msg(fmt.Sprintf("listen: %+v\n", err))
 		}
 	}()
-	log.Print("Server started")
+	log.Info().Msg("Server started")
 
 	<-ctx.Done()
 
-	log.Print("Server stopped")
+	log.Info().Msg("Server stopped")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer func() {
 		err := repo.Close()
 		if err != nil {
-			log.Printf("Caught an error due closing repository:%+v", err)
+			log.Error().Msg(fmt.Sprintf("Caught an error due closing repository:%+v", err))
 		}
 
-		log.Println("Everything is closed properly")
+		log.Info().Msg("Everything is closed properly")
 		cancel()
 	}()
 	if err := srv.Shutdown(ctx); err != nil {
-		log.Printf("Server Shutdown Failed:%+v", err)
+		log.Error().Msg(fmt.Sprintf("Server Shutdown Failed:%+v", err))
 	}
 	stop()
-	log.Print("Server exited properly")
+	log.Info().Msg("Server exited properly")
 }

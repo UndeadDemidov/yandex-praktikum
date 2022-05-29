@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	gonanoid "github.com/matoous/go-nanoid/v2"
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
 )
 
 var (
@@ -14,11 +14,7 @@ var (
 // createShortID создает короткий ID с проверкой на валидность
 func createShortID(ctx context.Context, isExist func(context.Context, string) bool) (id string, err error) {
 	for i := 0; i < 10; i++ {
-		id, err = gonanoid.New(8)
-		if err != nil {
-			return "", err
-		}
-		if !isExist(ctx, id) {
+		if !isExist(ctx, utils.NewUniqueID()) {
 			return id, nil
 		}
 	}

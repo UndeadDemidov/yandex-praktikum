@@ -7,6 +7,7 @@ require (
 	github.com/google/uuid v1.1.2
 	github.com/lib/pq v1.10.6
 	github.com/matoous/go-nanoid/v2 v2.0.0
+	github.com/rs/zerolog v1.26.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.11.0
 	github.com/stretchr/testify v1.7.1

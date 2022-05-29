@@ -20,9 +20,9 @@ func (rm RepoMock) IsExist(_ context.Context, _ string) bool {
 	return false
 }
 
-func (rm RepoMock) Store(_ context.Context, _ string, _ string, _ string) (err error) {
+func (rm RepoMock) Store(_ context.Context, _ string, _ string) (id string, err error) {
 	// rm.singleItemStorage = link
-	return nil
+	return mockedID, nil
 }
 
 func (rm RepoMock) Restore(_ context.Context, id string) (link string, err error) {
@@ -40,6 +40,6 @@ func (rm RepoMock) GetAllUserLinks(_ context.Context, _ string) map[string]strin
 	return map[string]string{mockedID: rm.singleItemStorage}
 }
 
-func (rm RepoMock) StoreBatch(_ context.Context, _ string, _ map[string]string) error {
-	return nil
+func (rm RepoMock) StoreBatch(_ context.Context, _ string, _ map[string]string) (batchOut map[string]string, err error) {
+	return map[string]string{}, nil
 }

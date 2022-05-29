@@ -15,11 +15,14 @@ import (
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
 	"github.com/go-chi/chi/v5"
 	gonanoid "github.com/matoous/go-nanoid/v2"
+	"github.com/rs/zerolog/log"
 )
 
 var (
 	ErrLinkIsAlreadyShortened = errors.New("link is already shortened")
 	ErrEmptyBatchToShort      = errors.New("nothing to short")
+	ErrDBIsNotInitialized     = errors.New("db is not initialized")
+	//ErrLinkNotProvided        = errors.New("The link is not provided")
 )
 
 // URLShortener - реализация интерфейса http.Handler
@@ -51,17 +54,19 @@ func NewURLShortener(base string, repo Repository, db *sql.DB) *URLShortener {
 func (s URLShortener) HandlePostShortenPlain(w http.ResponseWriter, r *http.Request) {
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		internalServerError(w, err)
 		return
 	}
 	// validate
 	if len(b) == 0 {
 		http.Error(w, "The link is not provided", http.StatusBadRequest)
+		log.Debug().Msg("User provided not a single link")
 		return
 	}
 	link := string(b)
 	if !utils.IsURL(link) {
-		http.Error(w, "Hey, Dude! Provide a link! Not the crap!", http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("Hey, Dude! Provide a link! Not the crap: %v", link), http.StatusBadRequest)
+		log.Debug().Msg(fmt.Sprintf("User provided data: %v", link))
 		return
 	}
 
@@ -76,7 +81,7 @@ func (s URLShortener) HandlePostShortenPlain(w http.ResponseWriter, r *http.Requ
 	case errors.Is(err, ErrLinkIsAlreadyShortened):
 		w.WriteHeader(http.StatusConflict)
 	case err != nil:
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		internalServerError(w, err)
 		return
 	default:
 		w.WriteHeader(http.StatusCreated)
@@ -84,7 +89,7 @@ func (s URLShortener) HandlePostShortenPlain(w http.ResponseWriter, r *http.Requ
 
 	_, err = w.Write([]byte(shortenedURL))
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		internalServerError(w, err)
 		return
 	}
 }
@@ -99,7 +104,8 @@ func (s URLShortener) HandlePostShortenJSON(w http.ResponseWriter, r *http.Reque
 		return
 	}
 	if !utils.IsURL(req.URL) {
-		http.Error(w, "Hey, Dude! Provide a link! Not the crap!", http.StatusBadRequest)
+		http.Error(w, fmt.Sprintf("Hey, Dude! Provide a link! Not the crap: %v", req.URL), http.StatusBadRequest)
+		log.Debug().Msg(fmt.Sprintf("User provided data: %v", req.URL))
 		return
 	}
 
@@ -114,7 +120,7 @@ func (s URLShortener) HandlePostShortenJSON(w http.ResponseWriter, r *http.Reque
 	case errors.Is(err, ErrLinkIsAlreadyShortened):
 		w.WriteHeader(http.StatusConflict)
 	case err != nil:
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		internalServerError(w, err)
 		return
 	default:
 		w.WriteHeader(http.StatusCreated)
@@ -123,8 +129,7 @@ func (s URLShortener) HandlePostShortenJSON(w http.ResponseWriter, r *http.Reque
 	resp := URLShortenResponse{Result: shortenedURL}
 	err = json.NewEncoder(w).Encode(&resp)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		internalServerError(w, err)
 	}
 }
 
@@ -152,6 +157,7 @@ func (s URLShortener) HandleGet(w http.ResponseWriter, r *http.Request) {
 	u, err := s.linkRepo.Restore(ctx, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
+		log.Debug().Err(err)
 		return
 	}
 	w.Header().Add("Location", u)
@@ -175,7 +181,7 @@ func (s URLShortener) HandleGetUserURLsBucket(w http.ResponseWriter, r *http.Req
 
 	err := json.NewEncoder(w).Encode(MapToBucket(s.baseURL, urlsMap))
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		internalServerError(w, err)
 		return
 	}
 }
@@ -188,26 +194,31 @@ func (s URLShortener) HandlePostShortenBatch(w http.ResponseWriter, r *http.Requ
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
 		http.Error(w, "proper JSON request is expected", http.StatusBadRequest)
+		log.Debug().Msg("corrupted JSON provided")
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
 	defer cancel()
 
+	w.Header().Set("Content-Type", "application/json")
+
 	user := midware.GetUserID(ctx)
 	var resp []URLShortenCorrelatedResponse
 	resp, err = s.shortenBatch(ctx, user, req)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	switch {
+	case errors.Is(err, ErrLinkIsAlreadyShortened):
+		w.WriteHeader(http.StatusConflict)
+	case err != nil:
+		internalServerError(w, err)
 		return
+	default:
+		w.WriteHeader(http.StatusCreated)
 	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
 
 	err = json.NewEncoder(w).Encode(&resp)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		internalServerError(w, err)
 		return
 	}
 }
@@ -218,44 +229,31 @@ func (s URLShortener) shortenBatch(ctx context.Context, user string, req []URLSh
 		return nil, ErrEmptyBatchToShort
 	}
 
-	batch := map[string]string{}
-	resp = make([]URLShortenCorrelatedResponse, 0, len(req))
-	for _, r := range req {
-		id, err := s.createShortID()
-		if err != nil {
-			// Вообще-то не очень здорово так делать
-			// лучше если просто continue - тогда из 100 ссылок сократиться 99,
-			// а не отстрелится весь батч
-			return nil, err
-		}
-		// Честно говоря, если бы не этот CorrelationID, то можно было бы и конфликт пакетной обработкой разбирать.
-		// И с ним можно реализовать, но реализация получается чудовищно кривой и непрозрачной.
-		// Например, в StoreBatch надо передавать CorrelationID, чтобы он на него выдавал ActualID.
-		// И далее производить замену.
-		// Если генерацию id перенести в Repository, то тогда опять же, надо передавать correlation_id,
-		// а это нарушает чистоту слоя Repository
-		// В общем формально задание выполнение, но CorrelationID - провоцирует кривую архитектуру.
-		// Нормальную архитектуру за 4 дня раздумий я не нашел, хотя какие только идеи не пытался реализовать.
-		// Из самого разумного - добавлять baseURL в конце отдельным циклом. Получается дополнительных 2 цикла,
-		// что тоже выглядит как кривая архитектура по кол-ву сравнений.
-		resp = append(resp, URLShortenCorrelatedResponse{
-			CorrelationID: r.CorrelationID,
-			ShortURL:      fmt.Sprintf("%s%s", s.baseURL, id),
-		})
-		batch[id] = r.OriginalURL
+	batchIn := map[string]string{} // map[correlation_id]original_link
+	for _, request := range req {
+		batchIn[request.CorrelationID] = request.OriginalURL
 	}
 
-	err = s.linkRepo.StoreBatch(ctx, user, batch)
-	if err != nil {
-		return nil, err
+	batchOut, err := s.linkRepo.StoreBatch(ctx, user, batchIn) // batchOut = map[correlation_id]short_id
+	if err != nil && !errors.Is(err, ErrLinkIsAlreadyShortened) {
+		return []URLShortenCorrelatedResponse{}, err
 	}
-	return resp, nil
+
+	resp = make([]URLShortenCorrelatedResponse, 0, len(req))
+	for corrID, id := range batchOut {
+		resp = append(resp, URLShortenCorrelatedResponse{
+			CorrelationID: corrID,
+			ShortURL:      fmt.Sprintf("%s%s", s.baseURL, id),
+		})
+	}
+	// err либо nil, либо ErrLinkIsAlreadyShortened
+	return resp, err
 }
 
 // HeartBeat - ручка для проверки, что подключение к БД живое
 func (s URLShortener) HeartBeat(w http.ResponseWriter, r *http.Request) {
 	if s.database == nil {
-		http.Error(w, "db is not initialized", http.StatusInternalServerError)
+		internalServerError(w, ErrDBIsNotInitialized)
 		return
 	}
 
@@ -263,7 +261,7 @@ func (s URLShortener) HeartBeat(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	if err := s.database.PingContext(ctx); err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		internalServerError(w, err)
 		return
 	}
 
@@ -271,7 +269,7 @@ func (s URLShortener) HeartBeat(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, err := w.Write([]byte("I'm alive (c)Helloween"))
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		internalServerError(w, err)
 	}
 }
 
@@ -288,10 +286,18 @@ func (s URLShortener) HandleNotFound(w http.ResponseWriter, _ *http.Request) {
 // Repository описывает контракт работы с хранилищем.
 // Используется для удобства тестирования и для дальнейшей легкой миграции на другой "движок".
 type Repository interface {
-	// IsExist(ctx context.Context, id string) bool
 	Store(ctx context.Context, user string, link string) (id string, err error)
 	Restore(ctx context.Context, id string) (link string, err error)
 	Close() error
 	GetAllUserLinks(ctx context.Context, user string) map[string]string
-	StoreBatch(ctx context.Context, user string, batch map[string]string) error
+	// StoreBatch сохраняет пакет ссылок в хранилище и возвращает список пакет id
+	// batchIn = map[correlation_id]original_link
+	// batchOut= map[correlation_id]short_link
+	// если error == ErrLinkIsAlreadyShortened значит среди пакета были ранее сокращенные ссылки
+	StoreBatch(ctx context.Context, user string, batchIn map[string]string) (batchOut map[string]string, err error)
+}
+
+func internalServerError(w http.ResponseWriter, err error) {
+	http.Error(w, err.Error(), http.StatusInternalServerError)
+	log.Error().Err(err)
 }

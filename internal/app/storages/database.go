@@ -8,6 +8,8 @@ import (
 	"log"
 	"time"
 
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
+
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
 )
 
@@ -26,8 +28,7 @@ const (
 						create unique index shortened_urls_id_uindex on shortened_urls (id);
 						create unique index shortened_urls_original_url_uindex on shortened_urls (original_url);
 						create index shortened_urls_user_id on shortened_urls (user_id);`
-	isExistQuery   = `SELECT COUNT(1) FROM shortened_urls WHERE id=$1`
-	storeStatement = `INSERT INTO shortened_urls (id, user_id, original_url) VALUES ($1, $2, $3);`
+	isExistQuery = `SELECT COUNT(1) FROM shortened_urls WHERE id=$1`
 	// Как говорит великий Том Кайт - если можно сделать одним SQL statement - сделай это!
 	// Если original_url уже есть, то возвращается его ID (независимо от user_id),
 	// Если
@@ -104,17 +105,19 @@ func (d DBStorage) isExist(ctx context.Context, id string) bool {
 
 // Store сохраняет ссылку в хранилище с указанным id. В случае конфликта c уже ранее сохраненным link
 // возвращает ошибку handlers.ErrLinkIsAlreadyShortened и id с раннего сохранения.
-// Вообще это не очень чистая реализация в Go, потому что в случае ошибки прозрачней указывать id пустой.
+// ToDo Вообще это не очень чистая реализация в Go, потому что в случае ошибки прозрачней указывать id пустой.
 // Или я не прав - и для Go так нормально???
-// ToDo можно сделать чище переместив id в возвращаемый параметр: Store(ctx context.Context, user string, link string, id *string) error
 func (d DBStorage) Store(ctx context.Context, user string, link string) (id string, err error) {
-	id, err = createShortID(ctx, d.isExist)
-	if err != nil {
-		return "", err
+	var actualID string
+	// две попытки для генерации уникального id
+	for i := 0; i < 2; i++ {
+		id = utils.NewUniqueID()
+		err = d.database.QueryRowContext(ctx, storeQuery, id, user, link).Scan(&actualID)
+		if err == nil || errors.Is(err, sql.ErrNoRows) {
+			break
+		}
 	}
 
-	var actualID string
-	err = d.database.QueryRowContext(ctx, storeQuery, id, user, link).Scan(&actualID)
 	if errors.Is(err, sql.ErrNoRows) {
 		// Если пустой сет записей, то успешно вставили запись
 		return id, nil
@@ -175,32 +178,64 @@ func (d DBStorage) GetAllUserLinks(ctx context.Context, user string) map[string]
 	return m
 }
 
-// StoreBatch сохраняет пакет ссылок из map[id]link
-func (d DBStorage) StoreBatch(ctx context.Context, user string, batch map[string]string) error {
+// StoreBatch сохраняет пакет ссылок из map[correlation_id]original_link и возвращает map[correlation_id]short_link.
+// В случае конфликта c уже ранее сохраненным link возвращает ошибку handlers.ErrLinkIsAlreadyShortened и id с раннего сохранения.
+func (d DBStorage) StoreBatch(ctx context.Context, user string, batchIn map[string]string) (batchOut map[string]string, err error) {
 	// шаг 1 — объявляем транзакцию
 	tx, err := d.database.Begin()
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// шаг 1.1 — если возникает ошибка, откатываем изменения
 	defer tx.Rollback()
 
 	// шаг 2 — готовим инструкцию
-	stmt, err := tx.PrepareContext(ctx, storeStatement)
+	query, err := tx.PrepareContext(ctx, storeQuery)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	// шаг 2.1 — не забываем закрыть инструкцию, когда она больше не нужна
-	defer stmt.Close()
+	defer query.Close()
 
-	for k, v := range batch {
+	batchOut = make(map[string]string)
+	conflict := false
+	for corrID, link := range batchIn {
 		// шаг 3 — указываем, что каждый элемент будет добавлен в транзакцию
-		if _, err = stmt.ExecContext(ctx, k, user, v); err != nil {
-			return err
+		var (
+			id       string
+			actualID string
+		)
+		// две попытки для генерации уникального id
+		for i := 0; i < 2; i++ {
+			id = utils.NewUniqueID()
+			err = query.QueryRowContext(ctx, id, user, link).Scan(&actualID)
+			if err == nil || errors.Is(err, sql.ErrNoRows) {
+				break
+			}
 		}
+
+		if errors.Is(err, sql.ErrNoRows) {
+			// Если пустой сет записей, то успешно вставили запись
+			batchOut[corrID] = id
+			continue
+		}
+		if err != nil {
+			return nil, err
+		}
+		batchOut[corrID] = actualID
+		conflict = true
 	}
+
 	// шаг 4 — сохраняем изменения
-	return tx.Commit()
+	err = tx.Commit()
+	if err != nil {
+		return nil, err
+	}
+
+	if conflict {
+		err = handlers.ErrLinkIsAlreadyShortened
+	}
+	return batchOut, err // err либо nil, либо ErrLinkIsAlreadyShortened
 }
 
 // Close закрывает базу данных

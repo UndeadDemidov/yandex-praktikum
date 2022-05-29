@@ -150,18 +150,25 @@ func (f *FileStorage) GetAllUserLinks(_ context.Context, user string) map[string
 	return m
 }
 
-// StoreBatch сохраняет пакет ссылок из map[id]link
-func (f *FileStorage) StoreBatch(_ context.Context, user string, batch map[string]string) error {
+// StoreBatch сохраняет пакет ссылок из map[correlation_id]original_link и возвращает map[correlation_id]short_link
+func (f *FileStorage) StoreBatch(ctx context.Context, user string, batchIn map[string]string) (batchOut map[string]string, err error) {
 	f.mx.Lock()
 	defer f.mx.Unlock()
 
-	for k, v := range batch {
-		err := f.store(user, k, v)
+	batchOut = make(map[string]string)
+	var id string
+	for corrID, link := range batchIn {
+		id, err = createShortID(ctx, f.isExist)
 		if err != nil {
-			return err
+			return nil, err
 		}
+		err = f.store(user, id, link)
+		if err != nil {
+			return nil, err
+		}
+		batchOut[corrID] = id
 	}
-	return nil
+	return batchOut, nil
 }
 
 // Close закрывает все файлы, открытых для записи и чтения
