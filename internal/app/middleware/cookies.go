@@ -54,11 +54,12 @@ func getUserID(w http.ResponseWriter, r *http.Request) (userID string, err error
 	cookie.Cookie = c
 	err = cookie.DetachSign()
 	switch {
-	case err == nil:
+	case err == nil: // кука подписана верно
 		return cookie.BaseValue, nil
-	case errors.Is(err, ErrSignedCookieInvalidSign):
+	case errors.Is(err, ErrSignedCookieInvalidSign): // кука подписана неверно
 		cookie = NewUserIDSignedCookie()
 		http.SetCookie(w, cookie.Cookie)
+		return cookie.BaseValue, nil
 	}
 	return "", err
 }
