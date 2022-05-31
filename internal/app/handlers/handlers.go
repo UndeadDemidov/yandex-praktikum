@@ -22,10 +22,7 @@ var (
 )
 
 // URLShortener - реализация интерфейса http.Handler
-// Согласно заданию 1-го инкремента
 type URLShortener struct {
-	// non-persistent storage
-	// just for starting
 	linkRepo Repository
 	baseURL  string
 }

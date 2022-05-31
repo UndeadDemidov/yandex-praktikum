@@ -11,71 +11,29 @@ import (
 
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/server"
-	"github.com/UndeadDemidov/yandex-praktikum/internal/app/storages/database"
-	"github.com/UndeadDemidov/yandex-praktikum/internal/app/storages/file"
-	"github.com/UndeadDemidov/yandex-praktikum/internal/app/storages/memory"
 	_ "github.com/lib/pq"
-	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
 )
 
+var (
+	repo handlers.Repository
+	db   *sql.DB
+)
+
 func main() {
-	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
-	srv, repo := CreateServer()
-	Run(srv, repo)
+	srv := CreateServer()
+	Run(srv)
 }
 
 // CreateServer создает сервер и возвращает его и репозиторий.
 // Можно заменить параметры на глобальные переменные, вроде как от этого ничего плохого не будет.
-func CreateServer() (*http.Server, handlers.Repository) {
-	var (
-		srv  *http.Server
-		db   *sql.DB
-		repo handlers.Repository
-		err  error
-	)
-
-	cs := viper.GetString("database-dsn")
-	if len(cs) != 0 {
-		db, err = sql.Open("postgres", cs)
-		if err != nil {
-			db = nil
-		}
-	}
-
-	repo = chooseRepo(viper.GetString("file-storage-path"), db)
-	srv = server.NewServer(viper.GetString("base-url"), viper.GetString("server-address"), repo)
-	return srv, repo
-}
-
-// chooseRepo возвращает сервер в зависимости от того, какие параметры были переданы
-func chooseRepo(filename string, db *sql.DB) (repo handlers.Repository) {
-	var err error
-
-	if db != nil {
-		repo, err = database.NewStorage(db)
-		if err == nil {
-			log.Info().Msg("In database storage will be used")
-			return repo
-		}
-	}
-
-	if len(filename) != 0 {
-		repo, err = file.NewStorage(filename)
-		if err == nil {
-			log.Info().Msg("In file storage will be used")
-			return repo
-		}
-	}
-
-	log.Info().Msg("In memory storage will be used")
-	return memory.NewStorage()
+func CreateServer() *http.Server {
+	return server.NewServer(viper.GetString("base-url"), viper.GetString("server-address"), repo)
 }
 
 // Run запускает сервер с указанным репозиторием и реализуем graceful shutdown
-func Run(srv *http.Server, repo handlers.Repository) {
+func Run(srv *http.Server) {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
