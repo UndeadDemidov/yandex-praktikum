@@ -1,10 +1,13 @@
 package utils
 
 import (
-	gonanoid "github.com/matoous/go-nanoid/v2"
+	"context"
 	"io/ioutil"
 	"net/url"
 	"os"
+
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app/storages"
+	gonanoid "github.com/matoous/go-nanoid/v2"
 )
 
 // IsURL проверяет ссылку на валидность.
@@ -40,4 +43,15 @@ func NewUniqueID() (id string) {
 		panic(err)
 	}
 	return id
+}
+
+// CreateShortID создает короткий ID с проверкой на валидность
+func CreateShortID(ctx context.Context, isExist func(context.Context, string) bool) (id string, err error) {
+	for i := 0; i < 10; i++ {
+		id = NewUniqueID()
+		if !isExist(ctx, id) {
+			return id, nil
+		}
+	}
+	return "", storages.ErrUnableCreateShortID
 }

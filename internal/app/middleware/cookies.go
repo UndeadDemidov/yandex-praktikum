@@ -11,6 +11,7 @@ import (
 	"strings"
 
 	"github.com/google/uuid"
+	"github.com/rs/zerolog/log"
 )
 
 const UserIDCookie = "YPUserID"
@@ -25,7 +26,7 @@ var (
 type LocalContext string
 
 func UserCookie(next http.Handler) http.Handler {
-	fn := func(w http.ResponseWriter, r *http.Request) {
+	middleware := func(w http.ResponseWriter, r *http.Request) {
 		ctx := r.Context()
 		user, err := getUserID(w, r)
 		if err != nil {
@@ -34,7 +35,7 @@ func UserCookie(next http.Handler) http.Handler {
 		ctx = context.WithValue(ctx, ContextUserIDKey, user)
 		next.ServeHTTP(w, r.WithContext(ctx))
 	}
-	return http.HandlerFunc(fn)
+	return http.HandlerFunc(middleware)
 }
 
 func getUserID(w http.ResponseWriter, r *http.Request) (userID string, err error) {
@@ -44,22 +45,28 @@ func getUserID(w http.ResponseWriter, r *http.Request) (userID string, err error
 	}
 	// получить куку пользователя
 	c, err := r.Cookie(UserIDCookie)
+	// куки нет
 	if errors.Is(err, http.ErrNoCookie) {
 		http.SetCookie(w, cookie.Cookie)
-	} else {
-		cookie.Cookie = c
-		err = cookie.DetachSign()
-		if errors.Is(err, ErrSignedCookieInvalidSign) {
-			cookie, err = NewUserIDSignedCookie()
-			if err != nil {
-				return "", err
-			}
-			http.SetCookie(w, cookie.Cookie)
-		} else if err != nil {
+		return cookie.BaseValue, nil
+	}
+	if err != nil {
+		return "", err
+	}
+	// кука есть
+	cookie.Cookie = c
+	err = cookie.DetachSign()
+	switch {
+	case err == nil:
+		return cookie.BaseValue, nil
+	case errors.Is(err, ErrSignedCookieInvalidSign):
+		cookie, err = NewUserIDSignedCookie()
+		if err != nil {
 			return "", err
 		}
+		http.SetCookie(w, cookie.Cookie)
 	}
-	return cookie.BaseValue, nil
+	return "", err
 }
 
 // GetUserID возвращает сохраненный в контексте куку UserIDCookie
@@ -105,7 +112,7 @@ func NewUserIDSignedCookie() (sc SignedCookie, err error) {
 func (sc *SignedCookie) AttachSign() (err error) {
 	sc.BaseValue = sc.Value
 	if len(sc.key) == 0 {
-		err = sc.RecalcKey()
+		sc.RecalcKey()
 		if err != nil {
 			return err
 		}
@@ -122,17 +129,15 @@ func (sc *SignedCookie) calcSign() []byte {
 	return h.Sum(nil)
 }
 
-func (sc *SignedCookie) RecalcKey() (err error) {
+func (sc *SignedCookie) RecalcKey() {
 	if sc.SaltStartIdx == 0 || sc.SaltEndIdx == 0 ||
 		sc.SaltEndIdx < sc.SaltStartIdx || sc.SaltEndIdx > uint(len(sc.BaseValue)) {
-		return ErrSignedCookieSaltNotSetProperly
+		log.Panic().Msg(ErrSignedCookieSaltNotSetProperly.Error())
 	}
 
 	var secretKey = []byte("secret key")
 	secretKey = append(secretKey, []byte(sc.BaseValue)[sc.SaltStartIdx:sc.SaltEndIdx]...)
 	sc.key = secretKey
-
-	return nil
 }
 
 func (sc *SignedCookie) DetachSign() (err error) {
@@ -141,10 +146,7 @@ func (sc *SignedCookie) DetachSign() (err error) {
 		return ErrSignedCookieInvalidValueOrUnsigned
 	}
 	sc.BaseValue = ss[0]
-	err = sc.RecalcKey()
-	if err != nil {
-		return err
-	}
+	sc.RecalcKey()
 
 	sgn := ss[1]
 	if hex.EncodeToString(sc.calcSign()) != sgn {

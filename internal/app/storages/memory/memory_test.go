@@ -1,4 +1,4 @@
-package storages
+package memory
 
 import (
 	"context"
@@ -51,7 +51,7 @@ func TestLinkStorage_Restore(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ls := MemoryStorage{
+			ls := Storage{
 				storage: tt.fields.storage,
 			}
 			gotLink, err := ls.Restore(context.Background(), tt.args.id)
@@ -98,7 +98,7 @@ func TestLinkStorage_Store(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ms := &MemoryStorage{
+			ms := &Storage{
 				storage: tt.fields.storage,
 			}
 			ctx := context.Background()
@@ -150,7 +150,7 @@ func TestMemoryStorage_isExist(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			ms := &MemoryStorage{
+			ms := &Storage{
 				storage: tt.fields.storage,
 			}
 			ctx := context.Background()

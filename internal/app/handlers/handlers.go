@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -20,7 +19,6 @@ import (
 var (
 	ErrLinkIsAlreadyShortened = errors.New("link is already shortened")
 	ErrEmptyBatchToShort      = errors.New("nothing to short")
-	ErrDBIsNotInitialized     = errors.New("db is not initialized")
 )
 
 // URLShortener - реализация интерфейса http.Handler
@@ -30,11 +28,10 @@ type URLShortener struct {
 	// just for starting
 	linkRepo Repository
 	baseURL  string
-	database *sql.DB
 }
 
 // NewURLShortener создает URLShortener и инициализирует его
-func NewURLShortener(base string, repo Repository, db *sql.DB) *URLShortener {
+func NewURLShortener(base string, repo Repository) *URLShortener {
 	h := URLShortener{}
 	h.linkRepo = repo
 	if utils.IsURL(base) {
@@ -42,7 +39,6 @@ func NewURLShortener(base string, repo Repository, db *sql.DB) *URLShortener {
 	} else {
 		h.baseURL = "http://localhost:8080/"
 	}
-	h.database = db
 
 	return &h
 }
@@ -147,13 +143,13 @@ func (s URLShortener) HandleGet(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
 	defer cancel()
 
-	u, err := s.linkRepo.Restore(ctx, id)
+	url, err := s.linkRepo.Restore(ctx, id)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		log.Debug().Err(err)
 		return
 	}
-	w.Header().Add("Location", u)
+	w.Header().Add("Location", url)
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
@@ -245,15 +241,10 @@ func (s URLShortener) shortenBatch(ctx context.Context, user string, req []URLSh
 
 // HeartBeat - ручка для проверки, что подключение к БД живое
 func (s URLShortener) HeartBeat(w http.ResponseWriter, r *http.Request) {
-	if s.database == nil {
-		internalServerError(w, ErrDBIsNotInitialized)
-		return
-	}
-
 	ctx, cancel := context.WithTimeout(r.Context(), 1*time.Second)
 	defer cancel()
 
-	if err := s.database.PingContext(ctx); err != nil {
+	if err := s.linkRepo.Ping(ctx); err != nil {
 		internalServerError(w, err)
 		return
 	}
@@ -281,13 +272,14 @@ func (s URLShortener) HandleNotFound(w http.ResponseWriter, _ *http.Request) {
 type Repository interface {
 	Store(ctx context.Context, user string, link string) (id string, err error)
 	Restore(ctx context.Context, id string) (link string, err error)
-	Close() error
 	GetAllUserLinks(ctx context.Context, user string) map[string]string
 	// StoreBatch сохраняет пакет ссылок в хранилище и возвращает список пакет id
 	// batchIn = map[correlation_id]original_link
 	// batchOut= map[correlation_id]short_link
 	// если error == ErrLinkIsAlreadyShortened значит среди пакета были ранее сокращенные ссылки
 	StoreBatch(ctx context.Context, user string, batchIn map[string]string) (batchOut map[string]string, err error)
+	Ping(context.Context) error
+	Close() error
 }
 
 func internalServerError(w http.ResponseWriter, err error) {

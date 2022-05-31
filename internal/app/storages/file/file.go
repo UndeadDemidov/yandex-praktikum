@@ -1,4 +1,4 @@
-package storages
+package file
 
 import (
 	"bufio"
@@ -6,34 +6,36 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
 	"io"
 	"os"
 	"strings"
 	"sync"
 
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app/storages"
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app/storages/memory"
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
 )
 
-// FileStorage реализует хранение ссылок в файле.
+// Storage реализует хранение ссылок в файле.
 // Выполнена простейшая реализация для сдачи работы.
-type FileStorage struct {
+type Storage struct {
 	mx sync.Mutex
 	// Ридер один, но в теории правильней было бы сделать пул ридеров,
 	// так как в таком сервисе кол-во чтений в разы (десятки/сотни раз) больше,
 	// чем записей
-	storageReader *reader
-	storageWriter *writer
+	storageReader *Reader
+	storageWriter *Writer
 }
 
-var _ handlers.Repository = (*FileStorage)(nil)
+var _ handlers.Repository = (*Storage)(nil)
 
-// NewFileStorage cоздаёт и возвращает экземпляр FileStorage
-func NewFileStorage(filename string) (fs *FileStorage, err error) {
+// NewStorage cоздаёт и возвращает экземпляр Storage
+func NewStorage(filename string) (fs *Storage, err error) {
 	if err = utils.CheckFilename(filename); err != nil {
 		return nil, err
 	}
-	fs = &FileStorage{}
+	fs = &Storage{}
 	fs.storageReader, err = NewReader(filename)
 	if err != nil {
 		return nil, err
@@ -47,13 +49,13 @@ func NewFileStorage(filename string) (fs *FileStorage, err error) {
 
 // isExist проверяет наличие в файле указанного ID
 // Если такой ID входит как подстрока в ссылку, то результат будет такой же, как если бы был найден ID
-func (f *FileStorage) isExist(_ context.Context, id string) bool {
-	_, err := f.storageReader.file.Seek(0, io.SeekStart)
+func (s *Storage) isExist(_ context.Context, id string) bool {
+	_, err := s.storageReader.file.Seek(0, io.SeekStart)
 	if err != nil {
 		return false
 	}
 
-	scanner := bufio.NewScanner(f.storageReader.file)
+	scanner := bufio.NewScanner(s.storageReader.file)
 	for scanner.Scan() {
 		if strings.Contains(scanner.Text(), id) {
 			// Не обрабатывается ситуация, когда в одной из ссылок может быть подстрока равная ID
@@ -69,16 +71,16 @@ func (f *FileStorage) isExist(_ context.Context, id string) bool {
 }
 
 // Store - сохраняет ID и ссылку в формате JSON во внешнем файле
-func (f *FileStorage) Store(ctx context.Context, user string, link string) (id string, err error) {
-	f.mx.Lock()
-	defer f.mx.Unlock()
+func (s *Storage) Store(ctx context.Context, user string, link string) (id string, err error) {
+	s.mx.Lock()
+	defer s.mx.Unlock()
 
-	id, err = createShortID(ctx, f.isExist)
+	id, err = utils.CreateShortID(ctx, s.isExist)
 	if err != nil {
 		return "", err
 	}
 
-	err = f.store(user, id, link)
+	err = s.store(user, id, link)
 	if err != nil {
 		return "", err
 	}
@@ -86,9 +88,9 @@ func (f *FileStorage) Store(ctx context.Context, user string, link string) (id s
 	return id, err
 }
 
-func (f *FileStorage) store(user string, id string, link string) error {
+func (s *Storage) store(user string, id string, link string) error {
 	a := Alias{User: user, Key: id, URL: link}
-	err := f.storageWriter.Write(&a)
+	err := s.storageWriter.Write(&a)
 	if err != nil {
 		return err
 	}
@@ -96,19 +98,19 @@ func (f *FileStorage) store(user string, id string, link string) error {
 }
 
 // Restore - находит по ID ссылку во внешнем файле, где данные хранятся в формате JSON
-func (f *FileStorage) Restore(_ context.Context, id string) (link string, err error) {
-	f.mx.Lock()
-	defer f.mx.Unlock()
+func (s *Storage) Restore(_ context.Context, id string) (link string, err error) {
+	s.mx.Lock()
+	defer s.mx.Unlock()
 
-	_, err = f.storageReader.file.Seek(0, io.SeekStart)
+	_, err = s.storageReader.file.Seek(0, io.SeekStart)
 	if err != nil {
 		return "", err
 	}
 
 	for {
-		alias, err := f.storageReader.Read()
+		alias, err := s.storageReader.Read()
 		if err != nil {
-			return "", fmt.Errorf(ErrLinkNotFound, id)
+			return "", fmt.Errorf(memory.ErrLinkNotFound, id)
 		}
 
 		if alias.Key == id {
@@ -118,23 +120,21 @@ func (f *FileStorage) Restore(_ context.Context, id string) (link string, err er
 }
 
 // GetAllUserLinks возвращает map[id]link ранее сокращенных ссылок указанным пользователем
-func (f *FileStorage) GetAllUserLinks(_ context.Context, user string) map[string]string {
-	f.mx.Lock()
-	defer f.mx.Unlock()
+func (s *Storage) GetAllUserLinks(_ context.Context, user string) map[string]string {
+	s.mx.Lock()
+	defer s.mx.Unlock()
 
 	m := map[string]string{}
-	_, err := f.storageReader.file.Seek(0, io.SeekStart)
+	_, err := s.storageReader.file.Seek(0, io.SeekStart)
 	if err != nil {
 		return map[string]string{}
 	}
 
-	scanner := bufio.NewScanner(f.storageReader.file)
+	scanner := bufio.NewScanner(s.storageReader.file)
 	for scanner.Scan() {
 		txt := scanner.Text()
 		if strings.Contains(txt, user) {
 			alias := &Alias{}
-			// ToDo вынести декодеры из reader/writer? Что-то не режется красиво на слои
-			// Либо опять по всему файлу бежать с unmarshal
 			dec := json.NewDecoder(bytes.NewBufferString(txt))
 			if err := dec.Decode(&alias); err != nil {
 				return map[string]string{}
@@ -151,18 +151,18 @@ func (f *FileStorage) GetAllUserLinks(_ context.Context, user string) map[string
 }
 
 // StoreBatch сохраняет пакет ссылок из map[correlation_id]original_link и возвращает map[correlation_id]short_link
-func (f *FileStorage) StoreBatch(ctx context.Context, user string, batchIn map[string]string) (batchOut map[string]string, err error) {
-	f.mx.Lock()
-	defer f.mx.Unlock()
+func (s *Storage) StoreBatch(ctx context.Context, user string, batchIn map[string]string) (batchOut map[string]string, err error) {
+	s.mx.Lock()
+	defer s.mx.Unlock()
 
 	batchOut = make(map[string]string)
 	var id string
 	for corrID, link := range batchIn {
-		id, err = createShortID(ctx, f.isExist)
+		id, err = utils.CreateShortID(ctx, s.isExist)
 		if err != nil {
 			return nil, err
 		}
-		err = f.store(user, id, link)
+		err = s.store(user, id, link)
 		if err != nil {
 			return nil, err
 		}
@@ -171,10 +171,23 @@ func (f *FileStorage) StoreBatch(ctx context.Context, user string, batchIn map[s
 	return batchOut, nil
 }
 
+// Ping проверяет, что файл хранения доступен и экземпляры инициализированы
+func (s *Storage) Ping(_ context.Context) error {
+	_, err := s.storageWriter.file.Stat()
+	if err != nil {
+		return storages.ErrStorageIsUnavailable
+	}
+	_, err = s.storageReader.file.Stat()
+	if err != nil {
+		return storages.ErrStorageIsUnavailable
+	}
+	return nil
+}
+
 // Close закрывает все файлы, открытых для записи и чтения
-func (f *FileStorage) Close() error {
-	err1 := f.storageReader.Close()
-	err2 := f.storageWriter.Close()
+func (s *Storage) Close() error {
+	err1 := s.storageReader.Close()
+	err2 := s.storageWriter.Close()
 	if err1 != nil {
 		return err1
 	}
@@ -184,47 +197,47 @@ func (f *FileStorage) Close() error {
 	return nil
 }
 
-type writer struct {
+type Writer struct {
 	file    *os.File
 	encoder *json.Encoder
 }
 
-func NewWriter(fileName string) (*writer, error) {
+func NewWriter(fileName string) (*Writer, error) {
 	file, err := os.OpenFile(fileName, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0644)
 	if err != nil {
 		return nil, err
 	}
-	return &writer{
+	return &Writer{
 		file:    file,
 		encoder: json.NewEncoder(file),
 	}, nil
 }
 
-func (p *writer) Write(event *Alias) error {
+func (p *Writer) Write(event *Alias) error {
 	return p.encoder.Encode(&event)
 }
 
-func (p *writer) Close() error {
+func (p *Writer) Close() error {
 	return p.file.Close()
 }
 
-type reader struct {
+type Reader struct {
 	file    *os.File
 	decoder *json.Decoder
 }
 
-func NewReader(fileName string) (*reader, error) {
+func NewReader(fileName string) (*Reader, error) {
 	file, err := os.OpenFile(fileName, os.O_RDONLY|os.O_CREATE, 0644)
 	if err != nil {
 		return nil, err
 	}
-	return &reader{
+	return &Reader{
 		file:    file,
 		decoder: json.NewDecoder(file),
 	}, nil
 }
 
-func (c *reader) Read() (*Alias, error) {
+func (c *Reader) Read() (*Alias, error) {
 	alias := &Alias{}
 	if err := c.decoder.Decode(&alias); err != nil {
 		return nil, err
@@ -232,7 +245,7 @@ func (c *reader) Read() (*Alias, error) {
 	return alias, nil
 }
 
-func (c *reader) Close() error {
+func (c *Reader) Close() error {
 	return c.file.Close()
 }
 

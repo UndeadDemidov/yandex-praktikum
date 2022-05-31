@@ -1,7 +1,6 @@
 package server
 
 import (
-	"database/sql"
 	"net/http"
 
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
@@ -11,9 +10,9 @@ import (
 )
 
 // NewServer создает и возвращает новый сервер с указанным репозиторием коротких ссылок
-func NewServer(baseURL string, addr string, repo handlers.Repository, db *sql.DB) *http.Server {
+func NewServer(baseURL string, addr string, repo handlers.Repository) *http.Server {
 	linkStore := repo
-	handler := handlers.NewURLShortener(baseURL, linkStore, db)
+	handler := handlers.NewURLShortener(baseURL, linkStore)
 
 	r := chi.NewRouter()
 	r.Use(middleware.Heartbeat("/health"))

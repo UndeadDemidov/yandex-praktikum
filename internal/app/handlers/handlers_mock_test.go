@@ -32,14 +32,18 @@ func (rm RepoMock) Restore(_ context.Context, id string) (link string, err error
 	return rm.singleItemStorage, nil
 }
 
-func (rm RepoMock) Close() error {
-	return nil
-}
-
 func (rm RepoMock) GetAllUserLinks(_ context.Context, _ string) map[string]string {
 	return map[string]string{mockedID: rm.singleItemStorage}
 }
 
 func (rm RepoMock) StoreBatch(_ context.Context, _ string, _ map[string]string) (batchOut map[string]string, err error) {
 	return map[string]string{}, nil
+}
+
+func (rm RepoMock) Close() error {
+	return nil
+}
+
+func (rm RepoMock) Ping(_ context.Context) error {
+	return nil
 }

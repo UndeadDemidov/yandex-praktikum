@@ -1,16 +1,16 @@
-package storages
+package database
 
 import (
 	"context"
 	"database/sql"
 	"errors"
 	"fmt"
-	"log"
 	"time"
 
-	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
-
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app/storages/memory"
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
+	"github.com/rs/zerolog/log"
 )
 
 const (
@@ -28,10 +28,9 @@ const (
 						create unique index shortened_urls_id_uindex on shortened_urls (id);
 						create unique index shortened_urls_original_url_uindex on shortened_urls (original_url);
 						create index shortened_urls_user_id on shortened_urls (user_id);`
-	isExistQuery = `SELECT COUNT(1) FROM shortened_urls WHERE id=$1`
 	// Как говорит великий Том Кайт - если можно сделать одним SQL statement - сделай это!
 	// Если original_url уже есть, то возвращается его ID (независимо от user_id),
-	// Если
+	// Если original_url еще нет, то возвращается пустой row set
 	storeQuery = `WITH inserted_rows AS (
 						INSERT INTO shortened_urls (id, user_id, original_url)
         				VALUES ($1, $2, $3)
@@ -46,20 +45,20 @@ const (
 	userBucketQuery = `SELECT id, original_url FROM shortened_urls WHERE user_id=$1`
 )
 
-// DBStorage реализует хранение ссылок в файле.
+// Storage реализует хранение ссылок в файле.
 // Выполнена простейшая реализация для сдачи работы.
-type DBStorage struct {
+type Storage struct {
 	database *sql.DB
 }
 
-var _ handlers.Repository = (*DBStorage)(nil)
+var _ handlers.Repository = (*Storage)(nil)
 
-// NewDBStorage cоздает и возвращает экземпляр DBStorage
-func NewDBStorage(db *sql.DB) (st *DBStorage, err error) {
-	st = &DBStorage{database: db}
+// NewStorage cоздает и возвращает экземпляр Storage
+func NewStorage(db *sql.DB) (st *Storage, err error) {
+	st = &Storage{database: db}
 	err = createDB(db)
 	if err != nil {
-		return &DBStorage{}, err
+		return &Storage{}, err
 	}
 	return st, nil
 }
@@ -88,31 +87,14 @@ func createDB(db *sql.DB) (err error) {
 	return nil
 }
 
-// IsExist проверяет наличие id в базе
-func (d DBStorage) isExist(ctx context.Context, id string) bool {
-	var cnt int64
-	err := d.database.QueryRowContext(ctx, isExistQuery, id).Scan(&cnt)
-	if err != nil {
-		// после 10 попытке свалиться в генерации уникального ID
-		return true
-	}
-
-	if cnt != 0 {
-		return true
-	}
-	return false
-}
-
 // Store сохраняет ссылку в хранилище с указанным id. В случае конфликта c уже ранее сохраненным link
 // возвращает ошибку handlers.ErrLinkIsAlreadyShortened и id с раннего сохранения.
-// ToDo Вообще это не очень чистая реализация в Go, потому что в случае ошибки прозрачней указывать id пустой.
-// Или я не прав - и для Go так нормально???
-func (d DBStorage) Store(ctx context.Context, user string, link string) (id string, err error) {
+func (s *Storage) Store(ctx context.Context, user string, link string) (id string, err error) {
 	var actualID string
 	// две попытки для генерации уникального id
 	for i := 0; i < 2; i++ {
 		id = utils.NewUniqueID()
-		err = d.database.QueryRowContext(ctx, storeQuery, id, user, link).Scan(&actualID)
+		err = s.database.QueryRowContext(ctx, storeQuery, id, user, link).Scan(&actualID)
 		if err == nil || errors.Is(err, sql.ErrNoRows) {
 			break
 		}
@@ -130,10 +112,10 @@ func (d DBStorage) Store(ctx context.Context, user string, link string) (id stri
 }
 
 // Restore возвращает исходную ссылку по переданному короткому ID
-func (d DBStorage) Restore(ctx context.Context, id string) (link string, err error) {
-	err = d.database.QueryRowContext(ctx, restoreQuery, id).Scan(&link)
+func (s *Storage) Restore(ctx context.Context, id string) (link string, err error) {
+	err = s.database.QueryRowContext(ctx, restoreQuery, id).Scan(&link)
 	if errors.Is(err, sql.ErrNoRows) {
-		return "", fmt.Errorf(ErrLinkNotFound, id)
+		return "", fmt.Errorf(memory.ErrLinkNotFound, id)
 	}
 	if err != nil {
 		return "", err
@@ -142,16 +124,16 @@ func (d DBStorage) Restore(ctx context.Context, id string) (link string, err err
 }
 
 // GetAllUserLinks возвращает map[id]link ранее сокращенных ссылок указанным пользователем
-func (d DBStorage) GetAllUserLinks(ctx context.Context, user string) map[string]string {
-	rows, err := d.database.QueryContext(ctx, userBucketQuery, user)
+func (s *Storage) GetAllUserLinks(ctx context.Context, user string) map[string]string {
+	rows, err := s.database.QueryContext(ctx, userBucketQuery, user)
 	if err != nil {
-		log.Println(err)
+		log.Err(err)
 		return map[string]string{}
 	}
 	defer func() {
 		err := rows.Close()
 		if err != nil {
-			log.Println(err)
+			log.Err(err)
 		}
 	}()
 
@@ -163,7 +145,7 @@ func (d DBStorage) GetAllUserLinks(ctx context.Context, user string) map[string]
 		)
 		err = rows.Scan(&id, &originalURL)
 		if err != nil {
-			log.Println(err)
+			log.Err(err)
 			return map[string]string{}
 		}
 		m[id] = originalURL
@@ -171,7 +153,7 @@ func (d DBStorage) GetAllUserLinks(ctx context.Context, user string) map[string]
 
 	err = rows.Err()
 	if err != nil {
-		log.Println(err)
+		log.Err(err)
 		return map[string]string{}
 	}
 
@@ -180,14 +162,18 @@ func (d DBStorage) GetAllUserLinks(ctx context.Context, user string) map[string]
 
 // StoreBatch сохраняет пакет ссылок из map[correlation_id]original_link и возвращает map[correlation_id]short_link.
 // В случае конфликта c уже ранее сохраненным link возвращает ошибку handlers.ErrLinkIsAlreadyShortened и id с раннего сохранения.
-func (d DBStorage) StoreBatch(ctx context.Context, user string, batchIn map[string]string) (batchOut map[string]string, err error) {
+func (s *Storage) StoreBatch(ctx context.Context, user string, batchIn map[string]string) (batchOut map[string]string, err error) {
 	// шаг 1 — объявляем транзакцию
-	tx, err := d.database.Begin()
+	tx, err := s.database.Begin()
 	if err != nil {
 		return nil, err
 	}
 	// шаг 1.1 — если возникает ошибка, откатываем изменения
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			log.Err(err)
+		}
+	}()
 
 	// шаг 2 — готовим инструкцию
 	query, err := tx.PrepareContext(ctx, storeQuery)
@@ -195,7 +181,11 @@ func (d DBStorage) StoreBatch(ctx context.Context, user string, batchIn map[stri
 		return nil, err
 	}
 	// шаг 2.1 — не забываем закрыть инструкцию, когда она больше не нужна
-	defer query.Close()
+	defer func() {
+		if err := query.Close(); err != nil {
+			log.Err(err)
+		}
+	}()
 
 	batchOut = make(map[string]string)
 	conflict := false
@@ -238,7 +228,12 @@ func (d DBStorage) StoreBatch(ctx context.Context, user string, batchIn map[stri
 	return batchOut, err // err либо nil, либо ErrLinkIsAlreadyShortened
 }
 
+// Ping проверяет доступность БД
+func (s *Storage) Ping(ctx context.Context) error {
+	return s.database.PingContext(ctx)
+}
+
 // Close закрывает базу данных
-func (d DBStorage) Close() error {
-	return d.database.Close()
+func (s *Storage) Close() error {
+	return s.database.Close()
 }

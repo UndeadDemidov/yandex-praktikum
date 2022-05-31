@@ -1,4 +1,4 @@
-package storages
+package file
 
 import (
 	"context"
@@ -37,10 +37,10 @@ func TestFileStorage_isExist(t *testing.T) {
 		},
 	}
 
-	filename := "file_storage.tst"
-	fs, err := NewFileStorage(filename)
+	filename := "file_storage.json"
+	fs, err := NewStorage(filename)
 	require.NoError(t, err)
-	defer func(fs *FileStorage) {
+	defer func(fs *Storage) {
 		err := fs.Close()
 		if err != nil {
 			log.Fatalln(err)
@@ -84,10 +84,10 @@ func TestFileStorage_Restore(t *testing.T) {
 		},
 	}
 
-	filename := "file_storage.tst"
-	fs, err := NewFileStorage(filename)
+	filename := "file_storage.json"
+	fs, err := NewStorage(filename)
 	require.NoError(t, err)
-	defer func(fs *FileStorage) {
+	defer func(fs *Storage) {
 		err := fs.Close()
 		if err != nil {
 			log.Fatalln(err)
@@ -134,7 +134,7 @@ func TestFileStorage_Store(t *testing.T) {
 	}
 
 	filename := "test_storage.txt"
-	fs, err := NewFileStorage(filename)
+	fs, err := NewStorage(filename)
 	require.NoError(t, err)
 	defer func(name string) {
 		err := os.Remove(name)
@@ -142,7 +142,7 @@ func TestFileStorage_Store(t *testing.T) {
 			log.Fatalln(err)
 		}
 	}(filename)
-	defer func(fs *FileStorage) {
+	defer func(fs *Storage) {
 		err := fs.Close()
 		if err != nil {
 			log.Fatalln(err)

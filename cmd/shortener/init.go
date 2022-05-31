@@ -1,9 +1,9 @@
 package main
 
 import (
-	"log"
 	"strings"
 
+	"github.com/rs/zerolog/log"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
@@ -16,7 +16,7 @@ func init() {
 	pflag.Parse()
 	err := viper.BindPFlags(pflag.CommandLine)
 	if err != nil {
-		log.Fatalln(err)
+		log.Fatal().Err(err).Msgf("can't bind argument flags %v", pflag.CommandLine)
 	}
 
 	viper.AutomaticEnv()
