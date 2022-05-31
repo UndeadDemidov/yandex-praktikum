@@ -39,10 +39,7 @@ func UserCookie(next http.Handler) http.Handler {
 }
 
 func getUserID(w http.ResponseWriter, r *http.Request) (userID string, err error) {
-	cookie, err := NewUserIDSignedCookie()
-	if err != nil {
-		return "", err
-	}
+	cookie := NewUserIDSignedCookie()
 	// получить куку пользователя
 	c, err := r.Cookie(UserIDCookie)
 	// куки нет
@@ -60,10 +57,7 @@ func getUserID(w http.ResponseWriter, r *http.Request) (userID string, err error
 	case err == nil:
 		return cookie.BaseValue, nil
 	case errors.Is(err, ErrSignedCookieInvalidSign):
-		cookie, err = NewUserIDSignedCookie()
-		if err != nil {
-			return "", err
-		}
+		cookie = NewUserIDSignedCookie()
 		http.SetCookie(w, cookie.Cookie)
 	}
 	return "", err
@@ -89,7 +83,7 @@ type SignedCookie struct {
 	BaseValue    string
 }
 
-func NewUserIDSignedCookie() (sc SignedCookie, err error) {
+func NewUserIDSignedCookie() (sc SignedCookie) {
 	sc = SignedCookie{
 		Cookie: &http.Cookie{
 			Path:   "/",
@@ -102,25 +96,17 @@ func NewUserIDSignedCookie() (sc SignedCookie, err error) {
 		SaltEndIdx:   9,
 	}
 
-	err = sc.AttachSign()
-	if err != nil {
-		return SignedCookie{}, err
-	}
-	return sc, nil
+	sc.AttachSign()
+	return sc
 }
 
-func (sc *SignedCookie) AttachSign() (err error) {
+func (sc *SignedCookie) AttachSign() {
 	sc.BaseValue = sc.Value
 	if len(sc.key) == 0 {
 		sc.RecalcKey()
-		if err != nil {
-			return err
-		}
 	}
 	sc.sign = sc.calcSign()
-
 	sc.Value = fmt.Sprintf("%s|%s", sc.Value, hex.EncodeToString(sc.sign))
-	return nil
 }
 
 func (sc *SignedCookie) calcSign() []byte {
