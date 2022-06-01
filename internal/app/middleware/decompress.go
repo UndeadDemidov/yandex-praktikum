@@ -3,6 +3,8 @@ package middleware
 import (
 	"compress/gzip"
 	"net/http"
+
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
 )
 
 // Decompress реализует распаковку запроса переданного в сжатом gzip
@@ -13,14 +15,14 @@ func Decompress(next http.Handler) http.Handler {
 		if r.Header.Get("Content-Encoding") == "gzip" {
 			gz, err := gzip.NewReader(r.Body)
 			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				utils.InternalServerError(w, err)
 			}
-			defer func(gz *gzip.Reader) {
+			defer func() {
 				err := gz.Close()
 				if err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
+					utils.InternalServerError(w, err)
 				}
-			}(gz)
+			}()
 			r.Body = gz
 		}
 		next.ServeHTTP(w, r)

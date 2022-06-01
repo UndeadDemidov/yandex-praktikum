@@ -3,11 +3,13 @@ package utils
 import (
 	"context"
 	"io/ioutil"
+	"net/http"
 	"net/url"
 	"os"
 
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/storages"
 	gonanoid "github.com/matoous/go-nanoid/v2"
+	"github.com/rs/zerolog/log"
 )
 
 // IsURL проверяет ссылку на валидность.
@@ -54,4 +56,9 @@ func CreateShortID(ctx context.Context, isExist func(context.Context, string) bo
 		}
 	}
 	return "", storages.ErrUnableCreateShortID
+}
+
+func InternalServerError(w http.ResponseWriter, err error) {
+	http.Error(w, err.Error(), http.StatusInternalServerError)
+	log.Error().Err(err)
 }

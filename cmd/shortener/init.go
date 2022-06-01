@@ -35,7 +35,10 @@ func init() {
 }
 
 func initRepository() {
-	var err error
+	var (
+		err error
+		db  *sql.DB
+	)
 
 	cs := viper.GetString("database-dsn")
 	if len(cs) != 0 {

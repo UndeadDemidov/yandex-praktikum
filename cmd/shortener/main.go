@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"database/sql"
 	"net/http"
 	"os"
 	"os/signal"
@@ -16,10 +15,7 @@ import (
 	"github.com/spf13/viper"
 )
 
-var (
-	repo handlers.Repository
-	db   *sql.DB
-)
+var repo handlers.Repository
 
 func main() {
 	srv := CreateServer()

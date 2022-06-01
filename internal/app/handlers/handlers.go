@@ -45,7 +45,7 @@ func NewURLShortener(base string, repo Repository) *URLShortener {
 func (s URLShortener) HandlePostShortenPlain(w http.ResponseWriter, r *http.Request) {
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
-		internalServerError(w, err)
+		utils.InternalServerError(w, err)
 		return
 	}
 	// validate
@@ -72,7 +72,7 @@ func (s URLShortener) HandlePostShortenPlain(w http.ResponseWriter, r *http.Requ
 	case errors.Is(err, ErrLinkIsAlreadyShortened):
 		w.WriteHeader(http.StatusConflict)
 	case err != nil:
-		internalServerError(w, err)
+		utils.InternalServerError(w, err)
 		return
 	default:
 		w.WriteHeader(http.StatusCreated)
@@ -80,7 +80,7 @@ func (s URLShortener) HandlePostShortenPlain(w http.ResponseWriter, r *http.Requ
 
 	_, err = w.Write([]byte(shortenedURL))
 	if err != nil {
-		internalServerError(w, err)
+		utils.InternalServerError(w, err)
 		return
 	}
 }
@@ -111,7 +111,7 @@ func (s URLShortener) HandlePostShortenJSON(w http.ResponseWriter, r *http.Reque
 	case errors.Is(err, ErrLinkIsAlreadyShortened):
 		w.WriteHeader(http.StatusConflict)
 	case err != nil:
-		internalServerError(w, err)
+		utils.InternalServerError(w, err)
 		return
 	default:
 		w.WriteHeader(http.StatusCreated)
@@ -120,7 +120,7 @@ func (s URLShortener) HandlePostShortenJSON(w http.ResponseWriter, r *http.Reque
 	resp := URLShortenResponse{Result: shortenedURL}
 	err = json.NewEncoder(w).Encode(&resp)
 	if err != nil {
-		internalServerError(w, err)
+		utils.InternalServerError(w, err)
 	}
 }
 
@@ -167,7 +167,7 @@ func (s URLShortener) HandleGetUserURLsBucket(w http.ResponseWriter, r *http.Req
 
 	err := json.NewEncoder(w).Encode(MapToBucket(s.baseURL, urlsMap))
 	if err != nil {
-		internalServerError(w, err)
+		utils.InternalServerError(w, err)
 		return
 	}
 }
@@ -196,7 +196,7 @@ func (s URLShortener) HandlePostShortenBatch(w http.ResponseWriter, r *http.Requ
 	case errors.Is(err, ErrLinkIsAlreadyShortened):
 		w.WriteHeader(http.StatusConflict)
 	case err != nil:
-		internalServerError(w, err)
+		utils.InternalServerError(w, err)
 		return
 	default:
 		w.WriteHeader(http.StatusCreated)
@@ -204,7 +204,7 @@ func (s URLShortener) HandlePostShortenBatch(w http.ResponseWriter, r *http.Requ
 
 	err = json.NewEncoder(w).Encode(&resp)
 	if err != nil {
-		internalServerError(w, err)
+		utils.InternalServerError(w, err)
 		return
 	}
 }
@@ -242,7 +242,7 @@ func (s URLShortener) HeartBeat(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	if err := s.linkRepo.Ping(ctx); err != nil {
-		internalServerError(w, err)
+		utils.InternalServerError(w, err)
 		return
 	}
 
@@ -250,7 +250,7 @@ func (s URLShortener) HeartBeat(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	_, err := w.Write([]byte("I'm alive (c)Helloween"))
 	if err != nil {
-		internalServerError(w, err)
+		utils.InternalServerError(w, err)
 	}
 }
 
@@ -277,9 +277,4 @@ type Repository interface {
 	StoreBatch(ctx context.Context, user string, batchIn map[string]string) (batchOut map[string]string, err error)
 	Ping(context.Context) error
 	Close() error
-}
-
-func internalServerError(w http.ResponseWriter, err error) {
-	http.Error(w, err.Error(), http.StatusInternalServerError)
-	log.Error().Err(err)
 }
