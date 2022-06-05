@@ -2,56 +2,60 @@ package main
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"github.com/spf13/viper"
-
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/server"
-	"github.com/UndeadDemidov/yandex-praktikum/internal/app/storages"
+	_ "github.com/lib/pq"
+	"github.com/rs/zerolog/log"
+	"github.com/spf13/viper"
 )
 
-// ToDo Поленился вынести все в что-нибудь типа Execute()
-// Сделаю в первый же выходной перед 3-м спринтом
+var repo handlers.Repository
+
 func main() {
-	var s *http.Server
-	var r handlers.Repository
-	var err error
+	srv := CreateServer()
+	Run(srv)
+}
 
-	if r, err = storages.NewFileStorage(viper.GetString("file-storage-path")); err == nil {
-	} else {
-		r = storages.NewLinkStorage()
-		log.Print("In memory storage will be used")
-	}
-	s = server.NewServer(viper.GetString("base-url"), viper.GetString("server-address"), r)
+// CreateServer создает сервер и возвращает его и репозиторий.
+// Можно заменить параметры на глобальные переменные, вроде как от этого ничего плохого не будет.
+func CreateServer() *http.Server {
+	return server.NewServer(viper.GetString("base-url"), viper.GetString("server-address"), repo)
+}
 
-	// Пришлось сделать graceful shutdown, чтобы правильно закрывать файлы при остановке сервера
-	done := make(chan os.Signal, 1)
-	signal.Notify(done, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+// Run запускает сервер с указанным репозиторием и реализуем graceful shutdown
+func Run(srv *http.Server) {
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	defer stop()
 
 	go func() {
-		if err := s.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("listen: %s\n", err)
+		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatal().Msgf("listen: %+v\n", err)
 		}
 	}()
-	log.Print("Server started")
+	log.Info().Msg("Server started")
 
-	<-done
-	log.Print("Server stopped")
+	<-ctx.Done()
 
+	log.Info().Msg("Server stopped")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer func() {
-		_ = r.Close()
+		err := repo.Close()
+		if err != nil {
+			log.Error().Msgf("Caught an error due closing repository:%+v", err)
+		}
+
+		log.Info().Msg("Everything is closed properly")
 		cancel()
 	}()
-
-	if err := s.Shutdown(ctx); err != nil {
-		log.Fatalf("Server Shutdown Failed:%+v", err)
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Error().Msgf("Server Shutdown Failed:%+v", err)
 	}
-	log.Print("Server exited properly")
+	stop()
+	log.Info().Msg("Server exited properly")
 }

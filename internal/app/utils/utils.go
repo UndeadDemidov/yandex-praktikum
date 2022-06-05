@@ -1,15 +1,16 @@
 package utils
 
 import (
-	"errors"
+	"context"
 	"io/ioutil"
+	"net/http"
 	"net/url"
 	"os"
 
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app/storages"
 	gonanoid "github.com/matoous/go-nanoid/v2"
+	"github.com/rs/zerolog/log"
 )
-
-var ErrUnableCreateShortID = errors.New("couldn't create unique ID in 10 tries")
 
 // IsURL проверяет ссылку на валидность.
 // Хотел сначала на регулярках сделать, потом со стековерфлоу согрешил
@@ -26,24 +27,38 @@ func CheckFilename(filename string) (err error) {
 
 	// Attempt to create it
 	var d []byte
-	if err = ioutil.WriteFile(filename, d, 0644); err == nil {
-		_ = os.Remove(filename) // And delete it
+	if err = ioutil.WriteFile(filename, d, 0644); err == nil { //nolint:gosec
+		err = os.Remove(filename) // And delete it
+		if err != nil {
+			return err
+		}
 		return nil
 	}
 
 	return err
 }
 
+func NewUniqueID() (id string) {
+	var err error
+	id, err = gonanoid.New(8)
+	if err != nil {
+		panic(err)
+	}
+	return id
+}
+
 // CreateShortID создает короткий ID с проверкой на валидность
-func CreateShortID(isExist func(string) bool) (id string, err error) {
+func CreateShortID(ctx context.Context, isExist func(context.Context, string) bool) (id string, err error) {
 	for i := 0; i < 10; i++ {
-		id, err = gonanoid.New(8)
-		if err != nil {
-			return "", err
-		}
-		if !isExist(id) {
+		id = NewUniqueID()
+		if !isExist(ctx, id) {
 			return id, nil
 		}
 	}
-	return "", ErrUnableCreateShortID
+	return "", storages.ErrUnableCreateShortID
+}
+
+func InternalServerError(w http.ResponseWriter, err error) {
+	http.Error(w, err.Error(), http.StatusInternalServerError)
+	log.Error().Err(err)
 }

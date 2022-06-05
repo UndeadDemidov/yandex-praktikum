@@ -10,11 +10,10 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
 	"github.com/go-chi/chi/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
 )
 
 func TestURLShortenerHandler_HandlePost(t *testing.T) {
@@ -57,8 +56,8 @@ func TestURLShortenerHandler_HandlePost(t *testing.T) {
 			reader := strings.NewReader(tt.body)
 			request := httptest.NewRequest(http.MethodPost, "/", reader)
 			w := httptest.NewRecorder()
-			h := NewURLShortenerHandler("http://localhost:8080/", RepoMock{})
-			h.HandlePost(w, request)
+			h := NewURLShortener("http://localhost:8080/", RepoMock{})
+			h.HandlePostShortenPlain(w, request)
 			result := w.Result()
 
 			urlResult, err := ioutil.ReadAll(result.Body)
@@ -72,6 +71,7 @@ func TestURLShortenerHandler_HandlePost(t *testing.T) {
 	}
 }
 
+//nolint:funlen
 func TestURLShortenerHandler_HandlePostShorten(t *testing.T) {
 	type want struct {
 		status  int
@@ -121,8 +121,8 @@ func TestURLShortenerHandler_HandlePostShorten(t *testing.T) {
 			reader := strings.NewReader(tt.reqBody)
 			request := httptest.NewRequest(http.MethodPost, "/", reader)
 			w := httptest.NewRecorder()
-			h := NewURLShortenerHandler("http://localhost:8080/", RepoMock{})
-			h.HandlePostShorten(w, request)
+			h := NewURLShortener("http://localhost:8080/", RepoMock{})
+			h.HandlePostShortenJSON(w, request)
 			result := w.Result()
 
 			require.Equal(t, tt.want.status, result.StatusCode)
@@ -181,7 +181,7 @@ func TestURLShortenerHandler_HandleGet(t *testing.T) {
 			rctx.URLParams.Add("id", tt.param)
 			r = r.WithContext(context.WithValue(r.Context(), chi.RouteCtxKey, rctx))
 
-			h := NewURLShortenerHandler("http://localhost:8080/", tt.args.repo)
+			h := NewURLShortener("http://localhost:8080/", tt.args.repo)
 			w := httptest.NewRecorder()
 			h.HandleGet(w, r)
 			result := w.Result()
