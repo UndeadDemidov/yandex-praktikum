@@ -128,8 +128,15 @@ func (s *Storage) Restore(ctx context.Context, id string) (link string, err erro
 	return
 }
 
-// GetAllUserLinks возвращает map[id]link ранее сокращенных ссылок указанным пользователем
-func (s *Storage) GetAllUserLinks(ctx context.Context, user string) map[string]string {
+// Unstore - помечает список ранее сохраненных ссылок удаленными
+// только тех ссылок, которые принадлежат пользователю
+func (s *Storage) Unstore(ctx context.Context, user string, ids []string) {
+	// TODO implement me
+	panic("implement me")
+}
+
+// GetUserStorage возвращает map[id]link ранее сокращенных ссылок указанным пользователем
+func (s *Storage) GetUserStorage(ctx context.Context, user string) map[string]string {
 	rows, err := s.database.QueryContext(ctx, userBucketQuery, user)
 	if err != nil {
 		log.Err(err)

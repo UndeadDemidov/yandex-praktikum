@@ -20,6 +20,8 @@ var (
 	ErrLinkIsAlreadyShortened = errors.New("link is already shortened")
 	ErrEmptyBatchToShort      = errors.New("nothing to short")
 	ErrLinkIsDeleted          = errors.New("link is deleted")
+	ErrMethodNotAllowed       = errors.New("method is not allowed, read task description carefully")
+	ErrProperJSONIsExpected   = errors.New("proper JSON is expected, read task description carefully")
 )
 
 // URLShortener - реализация интерфейса http.Handler
@@ -92,7 +94,7 @@ func (s URLShortener) HandlePostShortenJSON(w http.ResponseWriter, r *http.Reque
 	req := URLShortenRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
 	if err != nil {
-		http.Error(w, "JSON {\"url\":\"<some_url>\"} is expected", http.StatusBadRequest)
+		http.Error(w, ErrProperJSONIsExpected.Error(), http.StatusBadRequest)
 		return
 	}
 	if !utils.IsURL(req.URL) {
@@ -156,13 +158,32 @@ func (s URLShortener) HandleGet(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
+func (s URLShortener) HandleDelete(w http.ResponseWriter, r *http.Request) {
+	req := make([]URLID, 0)
+	err := json.NewDecoder(r.Body).Decode(&req)
+	if err != nil {
+		http.Error(w, ErrProperJSONIsExpected.Error(), http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
+	defer cancel()
+
+	user := midware.GetUserID(ctx)
+	w.WriteHeader(http.StatusAccepted)
+	_, err = w.Write([]byte(user))
+	if err != nil {
+		utils.InternalServerError(w, err)
+	}
+}
+
 // HandleGetUserURLsBucket - ручка для получения всех ссылок пользователя
 func (s URLShortener) HandleGetUserURLsBucket(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
 	defer cancel()
 
 	user := midware.GetUserID(ctx)
-	urlsMap := s.linkRepo.GetAllUserLinks(ctx, user)
+	urlsMap := s.linkRepo.GetUserStorage(ctx, user)
 	if len(urlsMap) == 0 {
 		w.WriteHeader(http.StatusNoContent)
 		return
@@ -262,12 +283,12 @@ func (s URLShortener) HeartBeat(w http.ResponseWriter, r *http.Request) {
 
 // HandleMethodNotAllowed обрабатывает не валидный HTTP метод
 func (s URLShortener) HandleMethodNotAllowed(w http.ResponseWriter, _ *http.Request) {
-	http.Error(w, "Only GET and POST requests are allowed!", http.StatusMethodNotAllowed)
+	http.Error(w, ErrMethodNotAllowed.Error(), http.StatusMethodNotAllowed)
 }
 
 // HandleNotFound обрабатывает не найденный путь
 func (s URLShortener) HandleNotFound(w http.ResponseWriter, _ *http.Request) {
-	http.Error(w, `Only POST "/" with link in body and GET "/{short_link_id} are allowed" `, http.StatusNotFound)
+	http.Error(w, ErrMethodNotAllowed.Error(), http.StatusNotFound)
 }
 
 // Repository описывает контракт работы с хранилищем.
@@ -277,7 +298,11 @@ type Repository interface {
 	// Restore возвращает оригинальную ссылку по его id
 	// если error == ErrLinkIsDeleted значит короткая ссылка (id) была удалена
 	Restore(ctx context.Context, id string) (link string, err error)
-	GetAllUserLinks(ctx context.Context, user string) map[string]string
+	// Unstore - помечает ссылки удаленными
+	// Согласно заданию - результат работы пользователю не возвращается
+	// Видимо, имеется ввиду, что процесс происходит асинхронно
+	Unstore(ctx context.Context, user string, ids []string)
+	GetUserStorage(ctx context.Context, user string) map[string]string
 	// StoreBatch сохраняет пакет ссылок в хранилище и возвращает список пакет id
 	// batchIn = map[correlation_id]original_link
 	// batchOut= map[correlation_id]short_link
