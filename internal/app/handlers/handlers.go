@@ -170,11 +170,16 @@ func (s URLShortener) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	user := midware.GetUserID(ctx)
+	s.unstore(ctx, user, req)
 	w.WriteHeader(http.StatusAccepted)
-	_, err = w.Write([]byte(user))
-	if err != nil {
-		utils.InternalServerError(w, err)
+}
+
+func (s URLShortener) unstore(ctx context.Context, user string, req []URLID) {
+	list := make([]string, 0, len(req))
+	for _, urlID := range req {
+		list = append(list, string(urlID))
 	}
+	s.linkRepo.Unstore(ctx, user, list)
 }
 
 // HandleGetUserURLsBucket - ручка для получения всех ссылок пользователя

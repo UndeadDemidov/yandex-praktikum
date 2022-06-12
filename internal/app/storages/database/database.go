@@ -43,6 +43,7 @@ const (
    						 WHERE NOT exists (SELECT 1 FROM inserted_rows)
    						   AND original_url=$3;`
 	restoreQuery    = `SELECT original_url, is_deleted FROM shortened_urls WHERE id=$1`
+	deleteStatement = `UPDATE shortened_urls SET is_deleted=true WHERE user_id=$1 AND id=$2`
 	userBucketQuery = `SELECT id, original_url FROM shortened_urls WHERE user_id=$1`
 )
 
@@ -131,8 +132,62 @@ func (s *Storage) Restore(ctx context.Context, id string) (link string, err erro
 // Unstore - помечает список ранее сохраненных ссылок удаленными
 // только тех ссылок, которые принадлежат пользователю
 func (s *Storage) Unstore(ctx context.Context, user string, ids []string) {
-	// TODO implement me
-	panic("implement me")
+	// делаем for и шлем каждый элемент в channel
+	// что успеет заслаться - то и обработается
+	select {
+	case <-ctx.Done():
+		return
+	default:
+		// тут будем слать по 1-му элементу
+		go s.unstoreBatch(user, ids)
+	}
+}
+
+func (s *Storage) unstoreBatch(user string, ids []string) {
+	// шаг 1 — объявляем транзакцию
+	tx, err := s.database.Begin()
+	if err != nil {
+		log.Err(err)
+		// ToDo return err
+	}
+	// шаг 1.1 — если возникает ошибка, откатываем изменения
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			log.Err(err)
+		}
+	}()
+
+	// Это чтобы мы тут тоже не зависли надолго
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+	// шаг 2 — готовим инструкцию
+	stmt, err := tx.PrepareContext(ctx, deleteStatement)
+	if err != nil {
+		log.Err(err)
+		// ToDo return err
+	}
+	// шаг 2.1 — не забываем закрыть инструкцию, когда она больше не нужна
+	defer func() {
+		if err := stmt.Close(); err != nil {
+			log.Err(err)
+		}
+	}()
+
+	// шаг 3 - выполняем задачу
+	for _, id := range ids {
+		_, err = stmt.ExecContext(ctx, user, id)
+		if err != nil {
+			log.Err(err)
+			// ToDo return err
+		}
+	}
+
+	// шаг 4 — сохраняем изменения
+	err = tx.Commit()
+	if err != nil {
+		log.Err(err)
+		// ToDo return err
+	}
 }
 
 // GetUserStorage возвращает map[id]link ранее сокращенных ссылок указанным пользователем
