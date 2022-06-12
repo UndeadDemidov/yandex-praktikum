@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
-	"github.com/UndeadDemidov/yandex-praktikum/internal/app/storages/memory"
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app/storages"
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
 	"github.com/rs/zerolog/log"
 )
@@ -23,7 +23,8 @@ const (
 						(
 						    id           VARCHAR not null constraint shortened_urls_pk primary key,
 						    user_id      uuid    not null,
-						    original_url VARCHAR not null
+						    original_url VARCHAR not null,
+						    is_deleted   BOOLEAN not null default false
 						);
 						create unique index shortened_urls_id_uindex on shortened_urls (id);
 						create unique index shortened_urls_original_url_uindex on shortened_urls (original_url);
@@ -41,7 +42,7 @@ const (
 						FROM shortened_urls
    						 WHERE NOT exists (SELECT 1 FROM inserted_rows)
    						   AND original_url=$3;`
-	restoreQuery    = `SELECT original_url FROM shortened_urls WHERE id=$1`
+	restoreQuery    = `SELECT original_url, is_deleted FROM shortened_urls WHERE id=$1`
 	userBucketQuery = `SELECT id, original_url FROM shortened_urls WHERE user_id=$1`
 )
 
@@ -113,13 +114,17 @@ func (s *Storage) Store(ctx context.Context, user string, link string) (id strin
 
 // Restore возвращает исходную ссылку по переданному короткому ID
 func (s *Storage) Restore(ctx context.Context, id string) (link string, err error) {
-	err = s.database.QueryRowContext(ctx, restoreQuery, id).Scan(&link)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", fmt.Errorf(memory.ErrLinkNotFound, id)
-	}
-	if err != nil {
+	var deleted bool
+	err = s.database.QueryRowContext(ctx, restoreQuery, id).Scan(&link, &deleted)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return "", fmt.Errorf(storages.ErrLinkNotFound, id)
+	case err != nil:
 		return "", err
+	case deleted:
+		return "", handlers.ErrLinkIsDeleted
 	}
+
 	return
 }
 

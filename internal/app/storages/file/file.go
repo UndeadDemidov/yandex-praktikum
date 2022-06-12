@@ -13,7 +13,6 @@ import (
 
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/storages"
-	"github.com/UndeadDemidov/yandex-praktikum/internal/app/storages/memory"
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
 )
 
@@ -110,7 +109,7 @@ func (s *Storage) Restore(_ context.Context, id string) (link string, err error)
 	for {
 		alias, err := s.storageReader.Read()
 		if err != nil {
-			return "", fmt.Errorf(memory.ErrLinkNotFound, id)
+			return "", fmt.Errorf(storages.ErrLinkNotFound, id)
 		}
 
 		if alias.Key == id {

@@ -19,6 +19,7 @@ import (
 var (
 	ErrLinkIsAlreadyShortened = errors.New("link is already shortened")
 	ErrEmptyBatchToShort      = errors.New("nothing to short")
+	ErrLinkIsDeleted          = errors.New("link is deleted")
 )
 
 // URLShortener - реализация интерфейса http.Handler
@@ -141,7 +142,12 @@ func (s URLShortener) HandleGet(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	url, err := s.linkRepo.Restore(ctx, id)
-	if err != nil {
+	switch {
+	case errors.Is(err, ErrLinkIsDeleted):
+		http.Error(w, err.Error(), http.StatusGone)
+		log.Debug().Err(err)
+		return
+	case err != nil:
 		http.Error(w, err.Error(), http.StatusBadRequest)
 		log.Debug().Err(err)
 		return
@@ -268,6 +274,8 @@ func (s URLShortener) HandleNotFound(w http.ResponseWriter, _ *http.Request) {
 // Используется для удобства тестирования и для дальнейшей легкой миграции на другой "движок".
 type Repository interface {
 	Store(ctx context.Context, user string, link string) (id string, err error)
+	// Restore возвращает оригинальную ссылку по его id
+	// если error == ErrLinkIsDeleted значит короткая ссылка (id) была удалена
 	Restore(ctx context.Context, id string) (link string, err error)
 	GetAllUserLinks(ctx context.Context, user string) map[string]string
 	// StoreBatch сохраняет пакет ссылок в хранилище и возвращает список пакет id
