@@ -53,7 +53,6 @@ const (
 // Выполнена простейшая реализация для сдачи работы.
 type Storage struct {
 	database *sql.DB
-	delJobs  chan userID
 	delBatch chan userID
 	done     chan bool
 }
@@ -68,7 +67,6 @@ func NewStorage(db *sql.DB) (st *Storage, err error) {
 		return &Storage{}, err
 	}
 
-	st.delJobs = make(chan userID)
 	st.delBatch = make(chan userID)
 	st.done = make(chan bool)
 	// Запускаем единственный consumer fanIn, в теории можно сделать пул consumers
@@ -145,27 +143,36 @@ func (s *Storage) Restore(ctx context.Context, id string) (link string, err erro
 // Unstore - помечает список ранее сохраненных ссылок удаленными
 // только тех ссылок, которые принадлежат пользователю
 func (s *Storage) Unstore(ctx context.Context, user string, ids []string) {
-	go s.unstoreProduce(ctx, user, ids)
+	ch := make(chan userID)
+	go s.unstoreProduce(ctx, ch, user, ids)
 	// на каждого продюсера один воркер
 	// ToDo можно сделать пул воркеров
-	go s.unstoreWork()
+	go s.unstoreWork(ch)
 }
 
-func (s *Storage) unstoreProduce(ctx context.Context, user string, ids []string) {
+func (s *Storage) unstoreProduce(_ context.Context, ch chan userID, user string, ids []string) {
 	// Делаем for и шлем каждый элемент в channel.
 	// Что успеет заслаться - то и обработается.
 	for i, id := range ids {
-		if _, ok := <-ctx.Done(); ok {
-			log.Debug().Msg("exit")
-			return
-		}
-		s.delJobs <- userID{User: user, ID: id}
+		// ToDo весь мозг себе сломал. Почему контекст тут завершается???
+		// Такой вариант обрабатывает 0..2 записи и выходит
+		// select {
+		// case <-ctx.Done():
+		// 	log.Debug().Msg("exit")
+		// 	return
+		// case ch <- userID{User: user, ID: id}:
+		// 	log.Debug().Msgf("%v", i)
+		// }
+		// Как отлаживать такие кейсы???
+
+		ch <- userID{User: user, ID: id}
 		log.Debug().Msgf("%v", i)
 	}
+	close(ch)
 }
 
-func (s *Storage) unstoreWork() {
-	for uID := range s.delJobs {
+func (s *Storage) unstoreWork(ch chan userID) {
+	for uID := range ch {
 		s.delBatch <- uID
 	}
 }
@@ -372,7 +379,6 @@ func (s *Storage) Close() error {
 	s.done <- true
 	// важен порядок закрытия!
 	close(s.delBatch)
-	close(s.delJobs)
 	close(s.done)
 	return s.database.Close()
 }
