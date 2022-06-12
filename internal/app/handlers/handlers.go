@@ -179,7 +179,9 @@ func (s URLShortener) unstore(ctx context.Context, user string, req []URLID) {
 	for _, urlID := range req {
 		list = append(list, string(urlID))
 	}
-	s.linkRepo.Unstore(ctx, user, list)
+	// Стартуем в отдельном thread, чтобы не блокировать handler, т.е. удаляем список id асинхронно
+	// Сколько вызовов - столько новых thread
+	go s.linkRepo.Unstore(ctx, user, list)
 }
 
 // HandleGetUserURLsBucket - ручка для получения всех ссылок пользователя
