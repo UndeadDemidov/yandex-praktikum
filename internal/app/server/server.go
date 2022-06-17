@@ -30,6 +30,7 @@ func NewServer(baseURL string, addr string, repo handlers.Repository) *http.Serv
 	r.Get("/{id}", handler.HandleGet)
 	r.Get("/api/user/urls", handler.HandleGetUserURLsBucket)
 	r.Get("/ping", handler.HeartBeat)
+	r.Delete("/api/user/urls", handler.HandleDelete)
 	r.NotFound(handler.HandleNotFound)
 	r.MethodNotAllowed(handler.HandleMethodNotAllowed)
 

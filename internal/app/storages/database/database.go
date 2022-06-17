@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
-	"github.com/UndeadDemidov/yandex-praktikum/internal/app/storages/memory"
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app/storages"
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
 	"github.com/rs/zerolog/log"
 )
@@ -23,7 +23,8 @@ const (
 						(
 						    id           VARCHAR not null constraint shortened_urls_pk primary key,
 						    user_id      uuid    not null,
-						    original_url VARCHAR not null
+						    original_url VARCHAR not null,
+						    is_deleted   BOOLEAN not null default false
 						);
 						create unique index shortened_urls_id_uindex on shortened_urls (id);
 						create unique index shortened_urls_original_url_uindex on shortened_urls (original_url);
@@ -41,14 +42,19 @@ const (
 						FROM shortened_urls
    						 WHERE NOT exists (SELECT 1 FROM inserted_rows)
    						   AND original_url=$3;`
-	restoreQuery    = `SELECT original_url FROM shortened_urls WHERE id=$1`
+	restoreQuery    = `SELECT original_url, is_deleted FROM shortened_urls WHERE id=$1`
+	deleteStatement = `UPDATE shortened_urls SET is_deleted=true WHERE user_id=$1 AND id=$2`
 	userBucketQuery = `SELECT id, original_url FROM shortened_urls WHERE user_id=$1`
+
+	batchSize = 10
 )
 
 // Storage реализует хранение ссылок в файле.
 // Выполнена простейшая реализация для сдачи работы.
 type Storage struct {
 	database *sql.DB
+	delBatch chan userID
+	done     chan bool
 }
 
 var _ handlers.Repository = (*Storage)(nil)
@@ -60,6 +66,13 @@ func NewStorage(db *sql.DB) (st *Storage, err error) {
 	if err != nil {
 		return &Storage{}, err
 	}
+
+	st.delBatch = make(chan userID)
+	st.done = make(chan bool)
+	// Запускаем единственный consumer fanIn, в теории можно сделать пул consumers
+	// ToDo Нужно вырезать слой Service и там делать метод Run, где и будет запущен этот consumer
+	go st.unstoreConsume()
+
 	return st, nil
 }
 
@@ -113,18 +126,146 @@ func (s *Storage) Store(ctx context.Context, user string, link string) (id strin
 
 // Restore возвращает исходную ссылку по переданному короткому ID
 func (s *Storage) Restore(ctx context.Context, id string) (link string, err error) {
-	err = s.database.QueryRowContext(ctx, restoreQuery, id).Scan(&link)
-	if errors.Is(err, sql.ErrNoRows) {
-		return "", fmt.Errorf(memory.ErrLinkNotFound, id)
-	}
-	if err != nil {
+	var deleted bool
+	err = s.database.QueryRowContext(ctx, restoreQuery, id).Scan(&link, &deleted)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return "", fmt.Errorf(storages.ErrLinkNotFound, id)
+	case err != nil:
 		return "", err
+	case deleted:
+		return "", handlers.ErrLinkIsDeleted
 	}
+
 	return
 }
 
-// GetAllUserLinks возвращает map[id]link ранее сокращенных ссылок указанным пользователем
-func (s *Storage) GetAllUserLinks(ctx context.Context, user string) map[string]string {
+// Unstore - помечает список ранее сохраненных ссылок удаленными
+// только тех ссылок, которые принадлежат пользователю
+func (s *Storage) Unstore(ctx context.Context, user string, ids []string) {
+	ch := make(chan userID)
+	go s.unstoreProduce(ctx, ch, user, ids)
+	// на каждого продюсера один воркер
+	// ToDo можно сделать пул воркеров
+	go s.unstoreWork(ch)
+}
+
+func (s *Storage) unstoreProduce(_ context.Context, ch chan userID, user string, ids []string) {
+	// Делаем for и шлем каждый элемент в channel.
+	// Что успеет заслаться - то и обработается.
+	for i, id := range ids {
+		// ToDo весь мозг себе сломал. Почему контекст тут завершается???
+		// Такой вариант обрабатывает 0..2 записи и выходит
+		// select {
+		// case <-ctx.Done():
+		// 	log.Debug().Msg("exit")
+		// 	return
+		// case ch <- userID{User: user, ID: id}:
+		// 	log.Debug().Msgf("%v", i)
+		// }
+		// Как отлаживать такие кейсы???
+
+		ch <- userID{User: user, ID: id}
+		log.Debug().Msgf("%v", i)
+	}
+	close(ch)
+}
+
+func (s *Storage) unstoreWork(ch chan userID) {
+	for uID := range ch {
+		s.delBatch <- uID
+	}
+}
+
+// unstoreConsume собирает пакет определенного размера и выталкивает в БД.
+// Чтобы хвосты неполных пакетов не застревали, регулярно делаем flush
+func (s *Storage) unstoreConsume() {
+	flush := func() {
+		for {
+			time.Sleep(time.Second)
+			s.done <- true
+		}
+	}
+
+	go flush()
+
+	var buf = make([]userID, batchSize)
+	i := 0
+	for {
+		select {
+		case <-s.done:
+			if i != 0 {
+				log.Debug().Msg(fmt.Sprint(buf[:i]))
+				err := s.unstoreBatch(buf[:i])
+				if err != nil {
+					log.Err(err)
+				}
+				i = 0
+			}
+		case id, ok := <-s.delBatch:
+			if !ok {
+				return
+			}
+			if i == len(buf) {
+				log.Debug().Msg(fmt.Sprint(buf))
+				err := s.unstoreBatch(buf)
+				if err != nil {
+					log.Err(err)
+				}
+				i = 0
+			}
+			buf[i] = id
+			i++
+		}
+	}
+}
+
+func (s *Storage) unstoreBatch(ids []userID) error {
+	// шаг 1 — объявляем транзакцию
+	tx, err := s.database.Begin()
+	if err != nil {
+		return err
+	}
+	// шаг 1.1 — если возникает ошибка, откатываем изменения
+	defer func() {
+		if err := tx.Rollback(); err != nil {
+			log.Err(err)
+		}
+	}()
+
+	// Это чтобы мы тут тоже не зависли надолго
+	ctx, cancel := context.WithTimeout(context.Background(), 4*time.Second)
+	defer cancel()
+	// шаг 2 — готовим инструкцию
+	stmt, err := tx.PrepareContext(ctx, deleteStatement)
+	if err != nil {
+		return err
+	}
+	// шаг 2.1 — не забываем закрыть инструкцию, когда она больше не нужна
+	defer func() {
+		if err := stmt.Close(); err != nil {
+			log.Err(err)
+		}
+	}()
+
+	// шаг 3 - выполняем задачу
+	for _, id := range ids {
+		_, err = stmt.ExecContext(ctx, id.User, id.ID)
+		if err != nil {
+			return err
+		}
+	}
+
+	// шаг 4 — сохраняем изменения
+	err = tx.Commit()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+// GetUserStorage возвращает map[id]link ранее сокращенных ссылок указанным пользователем
+func (s *Storage) GetUserStorage(ctx context.Context, user string) map[string]string {
 	rows, err := s.database.QueryContext(ctx, userBucketQuery, user)
 	if err != nil {
 		log.Err(err)
@@ -235,5 +376,14 @@ func (s *Storage) Ping(ctx context.Context) error {
 
 // Close закрывает базу данных
 func (s *Storage) Close() error {
+	s.done <- true
+	// важен порядок закрытия!
+	close(s.delBatch)
+	close(s.done)
 	return s.database.Close()
+}
+
+type userID struct {
+	User string
+	ID   string
 }

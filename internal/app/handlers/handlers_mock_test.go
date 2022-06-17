@@ -32,7 +32,10 @@ func (rm RepoMock) Restore(_ context.Context, id string) (link string, err error
 	return rm.singleItemStorage, nil
 }
 
-func (rm RepoMock) GetAllUserLinks(_ context.Context, _ string) map[string]string {
+func (rm RepoMock) Unstore(_ context.Context, _ string, _ []string) {
+}
+
+func (rm RepoMock) GetUserStorage(_ context.Context, _ string) map[string]string {
 	return map[string]string{mockedID: rm.singleItemStorage}
 }
 

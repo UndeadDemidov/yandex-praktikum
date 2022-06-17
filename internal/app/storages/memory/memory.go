@@ -10,10 +10,6 @@ import (
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
 )
 
-const (
-	ErrLinkNotFound = "link not found with passed id %s"
-)
-
 // Storage реализует хранение ссылок в памяти.
 // Является потоко безопасной реализацией Repository
 type Storage struct {
@@ -71,11 +67,19 @@ func (s *Storage) Restore(_ context.Context, id string) (link string, err error)
 		}
 	}
 
-	return "", fmt.Errorf(ErrLinkNotFound, id)
+	return "", fmt.Errorf(storages.ErrLinkNotFound, id)
 }
 
-// GetAllUserLinks возвращает map[id]link ранее сокращенных ссылок указанным пользователем
-func (s *Storage) GetAllUserLinks(_ context.Context, user string) map[string]string {
+// Unstore - помечает список ранее сохраненных ссылок удаленными
+// только тех ссылок, которые принадлежат пользователю
+// Только для совместимости контракта
+func (s *Storage) Unstore(_ context.Context, _ string, _ []string) {
+	// ToDo реализовать для практики
+	panic("not implemented for memory storage")
+}
+
+// GetUserStorage возвращает map[id]link ранее сокращенных ссылок указанным пользователем
+func (s *Storage) GetUserStorage(_ context.Context, user string) map[string]string {
 	s.mx.Lock()
 	defer s.mx.Unlock()
 
