@@ -160,3 +160,41 @@ func TestFileStorage_Store(t *testing.T) {
 		})
 	}
 }
+
+func TestStorage_GetUserStorage(t *testing.T) {
+	type args struct {
+		user string
+	}
+	tests := []struct {
+		name string
+		args args
+		want map[string]string
+	}{
+		{
+			name: "empty bucket",
+			args: args{user: "yyyy"},
+			want: make(map[string]string),
+		},
+		{
+			name: "full bucket",
+			args: args{user: "xxxx"},
+			want: map[string]string{"1111": "https://ya.ru", "2222": "https://yandex.ru", "3333": "https://go.dev", "4444": "https://github.com/spf13/afero"},
+		},
+	}
+
+	filename := "file_storage.json"
+	fs, err := NewStorage(filename)
+	require.NoError(t, err)
+	defer func(fs *Storage) {
+		err := fs.Close()
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}(fs)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equalf(t, tt.want, fs.GetUserStorage(context.Background(), tt.args.user), "GetUserStorage(context.Background(), %v)", tt.args.user)
+		})
+	}
+}

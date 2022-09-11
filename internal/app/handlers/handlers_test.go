@@ -12,6 +12,7 @@ import (
 
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
 	"github.com/go-chi/chi/v5"
+	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -51,6 +52,7 @@ func TestURLShortenerHandler_HandlePost(t *testing.T) {
 			},
 		},
 	}
+	zerolog.SetGlobalLevel(zerolog.Disabled)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reader := strings.NewReader(tt.body)
@@ -116,6 +118,7 @@ func TestURLShortenerHandler_HandlePostShorten(t *testing.T) {
 			},
 		},
 	}
+	zerolog.SetGlobalLevel(zerolog.Disabled)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reader := strings.NewReader(tt.reqBody)
@@ -174,6 +177,7 @@ func TestURLShortenerHandler_HandleGet(t *testing.T) {
 			},
 		},
 	}
+	zerolog.SetGlobalLevel(zerolog.Disabled)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			r := httptest.NewRequest(http.MethodGet, tt.link, nil)
@@ -211,6 +215,7 @@ func TestURLShortener_HandleDelete(t *testing.T) {
 			},
 		},
 	}
+	zerolog.SetGlobalLevel(zerolog.Disabled)
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			reader := strings.NewReader(tt.reqBody)
@@ -224,5 +229,40 @@ func TestURLShortener_HandleDelete(t *testing.T) {
 
 			require.Equal(t, tt.want.status, result.StatusCode)
 		})
+	}
+}
+
+// Пример использования HandlePostShortenPlain
+func ExampleURLShortener_HandlePostShortenPlain() {
+	reader := strings.NewReader(`https://habr.com/ru/post/66931/`)
+	request := httptest.NewRequest(http.MethodPost, "/", reader)
+	w := httptest.NewRecorder()
+	h := NewURLShortener("http://localhost:8080/", RepoMock{})
+	h.HandlePostShortenPlain(w, request)
+	result := w.Result()
+
+	urlResult, err := ioutil.ReadAll(result.Body)
+	if err != nil {
+		panic(err)
+	}
+	err = result.Body.Close()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(string(urlResult))
+	// Output: http://localhost:8080/1111
+}
+
+// Пример использования HandleDelete
+func ExampleURLShortener_HandleDelete() {
+	reader := strings.NewReader(`["111","222"]`)
+	request := httptest.NewRequest(http.MethodDelete, "/", reader)
+	w := httptest.NewRecorder()
+	h := NewURLShortener("http://localhost:8080/", RepoMock{})
+	h.HandleDelete(w, request)
+	result := w.Result()
+	err := result.Body.Close()
+	if err != nil {
+		panic(err)
 	}
 }
