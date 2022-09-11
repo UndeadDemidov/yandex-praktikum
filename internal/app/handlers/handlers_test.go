@@ -193,3 +193,34 @@ func TestURLShortenerHandler_HandleGet(t *testing.T) {
 		})
 	}
 }
+
+func TestURLShortener_HandleDelete(t *testing.T) {
+	type want struct {
+		status int
+	}
+	tests := []struct {
+		name    string
+		reqBody string
+		want    want
+	}{
+		{
+			name:    "test",
+			reqBody: `["111","222"]`,
+			want: want{
+				status: http.StatusAccepted,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			reader := strings.NewReader(tt.reqBody)
+			request := httptest.NewRequest(http.MethodDelete, "/", reader)
+			w := httptest.NewRecorder()
+			h := NewURLShortener("http://localhost:8080/", RepoMock{})
+			h.HandleDelete(w, request)
+			result := w.Result()
+
+			require.Equal(t, tt.want.status, result.StatusCode)
+		})
+	}
+}

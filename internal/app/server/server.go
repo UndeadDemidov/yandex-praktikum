@@ -2,6 +2,7 @@ package server
 
 import (
 	"net/http"
+	_ "net/http/pprof"
 
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
 	midware "github.com/UndeadDemidov/yandex-praktikum/internal/app/middleware"
@@ -20,19 +21,27 @@ func NewServer(baseURL string, addr string, repo handlers.Repository) *http.Serv
 	r.Use(middleware.RealIP)
 	r.Use(middleware.Logger)
 	r.Use(middleware.Recoverer)
-	r.Use(middleware.Compress(5))
+
 	r.Use(midware.Decompress)
 	r.Use(midware.UserCookie)
 
-	r.Post("/", handler.HandlePostShortenPlain)
-	r.Post("/api/shorten", handler.HandlePostShortenJSON)
-	r.Post("/api/shorten/batch", handler.HandlePostShortenBatch)
-	r.Get("/{id}", handler.HandleGet)
-	r.Get("/api/user/urls", handler.HandleGetUserURLsBucket)
-	r.Get("/ping", handler.HeartBeat)
-	r.Delete("/api/user/urls", handler.HandleDelete)
-	r.NotFound(handler.HandleNotFound)
-	r.MethodNotAllowed(handler.HandleMethodNotAllowed)
+	r.Group(func(r chi.Router) {
+		r.Post("/", handler.HandlePostShortenPlain)
+		r.Post("/api/shorten", handler.HandlePostShortenJSON)
+		r.Get("/{id}", handler.HandleGet)
+		r.Get("/ping", handler.HeartBeat)
+		r.Delete("/api/user/urls", handler.HandleDelete)
+		r.NotFound(handler.HandleNotFound)
+		r.MethodNotAllowed(handler.HandleMethodNotAllowed)
+	})
+
+	r.Group(func(r chi.Router) {
+		r.Use(middleware.Compress(5))
+		r.Post("/api/shorten/batch", handler.HandlePostShortenBatch)
+		r.Get("/api/user/urls", handler.HandleGetUserURLsBucket)
+	})
+
+	r.Mount("/", http.DefaultServeMux)
 
 	s := &http.Server{
 		Addr:    addr,
