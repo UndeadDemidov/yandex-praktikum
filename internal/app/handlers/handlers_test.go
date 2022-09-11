@@ -219,6 +219,8 @@ func TestURLShortener_HandleDelete(t *testing.T) {
 			h := NewURLShortener("http://localhost:8080/", RepoMock{})
 			h.HandleDelete(w, request)
 			result := w.Result()
+			err := result.Body.Close()
+			require.NoError(t, err)
 
 			require.Equal(t, tt.want.status, result.StatusCode)
 		})
