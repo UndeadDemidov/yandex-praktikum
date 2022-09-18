@@ -2,7 +2,6 @@ package utils
 
 import (
 	"context"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -27,7 +26,7 @@ func CheckFilename(filename string) (err error) {
 
 	// Attempt to create it
 	var d []byte
-	if err = ioutil.WriteFile(filename, d, 0644); err == nil { //nolint:gosec
+	if err = os.WriteFile(filename, d, 0644); err == nil {
 		err = os.Remove(filename) // And delete it
 		if err != nil {
 			return err

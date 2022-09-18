@@ -19,12 +19,12 @@ import (
 // Storage реализует хранение ссылок в файле.
 // Выполнена простейшая реализация для сдачи работы.
 type Storage struct {
-	mx sync.Mutex
 	// Ридер один, но в теории правильней было бы сделать пул ридеров,
 	// так как в таком сервисе кол-во чтений в разы (десятки/сотни раз) больше,
 	// чем записей
 	storageReader *Reader
 	storageWriter *Writer
+	mx            sync.Mutex
 }
 
 var _ handlers.Repository = (*Storage)(nil)

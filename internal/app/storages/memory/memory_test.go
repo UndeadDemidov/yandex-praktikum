@@ -16,11 +16,11 @@ func TestLinkStorage_Restore(t *testing.T) {
 		id string
 	}
 	tests := []struct {
-		name     string
+		wantErr  assert.ErrorAssertionFunc
 		fields   fields
 		args     args
+		name     string
 		wantLink string
-		wantErr  assert.ErrorAssertionFunc
 	}{
 		{
 			name: "valid id",
@@ -72,10 +72,10 @@ func TestLinkStorage_Store(t *testing.T) {
 		link string
 	}
 	tests := []struct {
-		name    string
-		fields  fields
-		args    args
 		wantErr assert.ErrorAssertionFunc
+		fields  fields
+		name    string
+		args    args
 	}{
 		{
 			name: "store new link 1",
@@ -167,10 +167,10 @@ func TestStorage_GetUserStorage(t *testing.T) {
 		user string
 	}
 	tests := []struct {
-		name   string
-		fields fields
-		args   args
 		want   map[string]string
+		fields fields
+		name   string
+		args   args
 	}{
 		{
 			name: "empty bucket",

@@ -59,10 +59,10 @@ func TestFileStorage_Restore(t *testing.T) {
 		id string
 	}
 	tests := []struct {
-		name     string
-		args     args
-		wantLink string
 		wantErr  assert.ErrorAssertionFunc
+		name     string
+		wantLink string
+		args     args
 	}{
 		{
 			name:     "searching first item",
@@ -111,9 +111,9 @@ func TestFileStorage_Store(t *testing.T) {
 		link string
 	}
 	tests := []struct {
+		wantErr assert.ErrorAssertionFunc
 		name    string
 		args    args
-		wantErr assert.ErrorAssertionFunc
 	}{
 		{
 			name: "adding new item 1",
@@ -166,9 +166,9 @@ func TestStorage_GetUserStorage(t *testing.T) {
 		user string
 	}
 	tests := []struct {
+		want map[string]string
 		name string
 		args args
-		want map[string]string
 	}{
 		{
 			name: "empty bucket",
