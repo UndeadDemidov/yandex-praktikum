@@ -122,7 +122,6 @@ func (s *Storage) Restore(_ context.Context, id string) (link string, err error)
 // только тех ссылок, которые принадлежат пользователю
 // Только для совместимости контракта
 func (s *Storage) Unstore(_ context.Context, _ string, _ []string) {
-	// ToDo реализовать для практики
 	panic("not implemented for file storage")
 }
 

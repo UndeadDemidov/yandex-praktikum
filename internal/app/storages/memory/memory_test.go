@@ -158,3 +158,54 @@ func TestMemoryStorage_isExist(t *testing.T) {
 		})
 	}
 }
+
+func TestStorage_GetUserStorage(t *testing.T) {
+	type fields struct {
+		storage map[string]map[string]string
+	}
+	type args struct {
+		user string
+	}
+	tests := []struct {
+		name   string
+		fields fields
+		args   args
+		want   map[string]string
+	}{
+		{
+			name: "empty bucket",
+			fields: fields{storage: map[string]map[string]string{
+				"xxxx": {
+					"1111": "https://ya.ru",
+					"2222": "https://yandex.ru",
+					"3333": "https://practicum.yandex.ru/",
+				},
+			}},
+			args: args{user: "yyyy"},
+			want: make(map[string]string),
+		},
+		{
+			name: "full bucket",
+			fields: fields{storage: map[string]map[string]string{
+				"xxxx": {
+					"1111": "https://ya.ru",
+					"2222": "https://yandex.ru",
+					"3333": "https://practicum.yandex.ru/",
+				},
+			}},
+			args: args{user: "xxxx"},
+			want: map[string]string{"1111": "https://ya.ru", "2222": "https://yandex.ru", "3333": "https://practicum.yandex.ru/"},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Storage{
+				storage: tt.fields.storage,
+			}
+			assert.Equalf(
+				t, tt.want,
+				s.GetUserStorage(context.Background(), tt.args.user),
+				"GetUserStorage(context.Background(), %v)", tt.args.user)
+		})
+	}
+}

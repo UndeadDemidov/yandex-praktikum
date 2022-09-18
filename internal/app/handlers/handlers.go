@@ -24,13 +24,15 @@ var (
 	ErrProperJSONIsExpected   = errors.New("proper JSON is expected, read task description carefully")
 )
 
-// URLShortener - реализация интерфейса http.Handler
+// URLShortener - реализует набор методов для сокращения ссылок, хранение их оригинального состояние
+// и открытие по сокращенному варианту. Обеспечивается контроль авторства сокращенных ссылок.
 type URLShortener struct {
 	linkRepo Repository
 	baseURL  string
 }
 
-// NewURLShortener создает URLShortener и инициализирует его
+// NewURLShortener создает URLShortener и инициализирует его адресом, по которому будут доступны методы,
+// и репозиторием хранения ссылок.
 func NewURLShortener(base string, repo Repository) *URLShortener {
 	h := URLShortener{}
 	h.linkRepo = repo
@@ -43,8 +45,7 @@ func NewURLShortener(base string, repo Repository) *URLShortener {
 	return &h
 }
 
-// HandlePostShortenPlain - ручка для создания короткой ссылки
-// Оригинальная ссылка передается через Text Body
+// HandlePostShortenPlain - метод для создания короткой ссылки, где оригинальная ссылка передается через Text Body.
 func (s URLShortener) HandlePostShortenPlain(w http.ResponseWriter, r *http.Request) {
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -88,8 +89,7 @@ func (s URLShortener) HandlePostShortenPlain(w http.ResponseWriter, r *http.Requ
 	}
 }
 
-// HandlePostShortenJSON - ручка для создания короткой ссылки
-// Оригинальная ссылка передается через JSON Body
+// HandlePostShortenJSON - метод для создания короткой ссылки, где оригинальная ссылка передается с помощью JSON.
 func (s URLShortener) HandlePostShortenJSON(w http.ResponseWriter, r *http.Request) {
 	req := URLShortenRequest{}
 	err := json.NewDecoder(r.Body).Decode(&req)
@@ -137,7 +137,7 @@ func (s URLShortener) shorten(ctx context.Context, user string, originalURL stri
 	return "", err
 }
 
-// HandleGet - ручка для открытия по короткой ссылке
+// HandleGet - метод для открытия оригинальной ссылки по короткому варианту.
 func (s URLShortener) HandleGet(w http.ResponseWriter, r *http.Request) {
 	id := chi.URLParam(r, "id")
 	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
@@ -158,6 +158,8 @@ func (s URLShortener) HandleGet(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
+// HandleDelete - метод для удаления раннее созданных коротких ссылок.
+// На вход принимается json массив токенов коротких ссылок для удаления.
 func (s URLShortener) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	req := make([]URLID, 0)
 	err := json.NewDecoder(r.Body).Decode(&req)
@@ -184,7 +186,7 @@ func (s URLShortener) unstore(ctx context.Context, user string, req []URLID) {
 	go s.linkRepo.Unstore(ctx, user, list)
 }
 
-// HandleGetUserURLsBucket - ручка для получения всех ссылок пользователя
+// HandleGetUserURLsBucket - метод для получения всех сокращенных пользователем ссылок.
 func (s URLShortener) HandleGetUserURLsBucket(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
 	defer cancel()
@@ -206,9 +208,8 @@ func (s URLShortener) HandleGetUserURLsBucket(w http.ResponseWriter, r *http.Req
 	}
 }
 
-// HandlePostShortenBatch - ручка для создания коротких ссылок пакетом
-// Оригинальные ссылки передаются через JSON Body
-// ToDo есть желание переписать на stream. но задание с ошибкой все сильно усложняет
+// HandlePostShortenBatch - метод для создания коротких ссылок одним пакетом,
+// где оригинальные ссылки передаются через JSON.
 func (s URLShortener) HandlePostShortenBatch(w http.ResponseWriter, r *http.Request) {
 	var req []URLShortenCorrelatedRequest
 	err := json.NewDecoder(r.Body).Decode(&req)
@@ -270,7 +271,7 @@ func (s URLShortener) shortenBatch(ctx context.Context, user string, req []URLSh
 	return resp, err
 }
 
-// HeartBeat - ручка для проверки, что подключение к БД живое
+// HeartBeat - метод для проверки, что подключение к репозиторию живое.
 func (s URLShortener) HeartBeat(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 1*time.Second)
 	defer cancel()
@@ -301,20 +302,23 @@ func (s URLShortener) HandleNotFound(w http.ResponseWriter, _ *http.Request) {
 // Repository описывает контракт работы с хранилищем.
 // Используется для удобства тестирования и для дальнейшей легкой миграции на другой "движок".
 type Repository interface {
+	// Store сохраняет оригинальную ссылку и возвращает id (токен) сокращенного варианта.
 	Store(ctx context.Context, user string, link string) (id string, err error)
-	// Restore возвращает оригинальную ссылку по его id
-	// если error == ErrLinkIsDeleted значит короткая ссылка (id) была удалена
+	// Restore возвращает оригинальную ссылку по его id.
+	// если error == ErrLinkIsDeleted значит короткая ссылка (id) была удалена.
 	Restore(ctx context.Context, id string) (link string, err error)
-	// Unstore - помечает ссылки удаленными
-	// Согласно заданию - результат работы пользователю не возвращается
-	// Видимо, имеется ввиду, что процесс происходит асинхронно
+	// Unstore - помечает ссылки удаленными.
+	// Согласно заданию - результат работы пользователю не возвращается.
 	Unstore(ctx context.Context, user string, ids []string)
+	// GetUserStorage возвращает массив всех ранее сокращенных пользователей ссылок.
 	GetUserStorage(ctx context.Context, user string) map[string]string
-	// StoreBatch сохраняет пакет ссылок в хранилище и возвращает список пакет id
+	// StoreBatch сохраняет пакет ссылок в хранилище и возвращает список пакет id.
 	// batchIn = map[correlation_id]original_link
 	// batchOut= map[correlation_id]short_link
-	// если error == ErrLinkIsAlreadyShortened значит среди пакета были ранее сокращенные ссылки
+	// если error == ErrLinkIsAlreadyShortened значит среди пакета были ранее сокращенные ссылки.
 	StoreBatch(ctx context.Context, user string, batchIn map[string]string) (batchOut map[string]string, err error)
+	// Ping проверяет готовность к работе репозитория.
 	Ping(context.Context) error
+	// Close завершает работу репозитория в стиле graceful shutdown.
 	Close() error
 }

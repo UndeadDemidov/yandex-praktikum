@@ -154,17 +154,6 @@ func (s *Storage) unstoreProduce(_ context.Context, ch chan userID, user string,
 	// Делаем for и шлем каждый элемент в channel.
 	// Что успеет заслаться - то и обработается.
 	for i, id := range ids {
-		// ToDo весь мозг себе сломал. Почему контекст тут завершается???
-		// Такой вариант обрабатывает 0..2 записи и выходит
-		// select {
-		// case <-ctx.Done():
-		// 	log.Debug().Msg("exit")
-		// 	return
-		// case ch <- userID{User: user, ID: id}:
-		// 	log.Debug().Msgf("%v", i)
-		// }
-		// Как отлаживать такие кейсы???
-
 		ch <- userID{User: user, ID: id}
 		log.Debug().Msgf("%v", i)
 	}
