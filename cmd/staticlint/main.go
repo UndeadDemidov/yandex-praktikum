@@ -1,17 +1,3 @@
-/*
- staticlint implements set of static checks.
-
- Following checks are included:
-	1. All checks from golang.org/x/tools/go/analysis/passes
-	2. All SA checks from https://staticcheck.io/docs/checks/
-	3. ST1019 check from https://staticcheck.io/docs/checks/#ST1019
-	4. Check for database query in loops https://github.com/masibw/goone
-	5. Check wrapping errors https://github.com/fatih/errwrap
-	6. Check for calling os.Exit in main func of main package
-
-
-*/
-
 package main
 
 import (
@@ -141,56 +127,6 @@ func run(pass *analysis.Pass) (interface{}, error) {
 
 	return nil, nil
 }
-
-// func run(pass *analysis.Pass) (interface{}, error) {
-// 	isMainPkg := func(x *ast.File) bool {
-// 		return x.Name.Name == "main"
-// 	}
-//
-// 	isMainFunc := func(x *ast.FuncDecl) bool {
-// 		return x.Name.Name == "main"
-// 	}
-//
-// 	isOsExit := func(x *ast.SelectorExpr, isMain bool) bool {
-// 		if !isMain || x.X == nil {
-// 			return false
-// 		}
-// 		ident, ok := x.X.(*ast.Ident)
-// 		if !ok {
-// 			return false
-// 		}
-// 		if ident.Name == "os" && x.Sel.Name == "Exit" {
-// 			pass.Reportf(x.Sel.NamePos, "os.Exit called in main func in main package")
-// 			return true
-// 		}
-// 		return false
-// 	}
-//
-// 	for _, file := range pass.Files {
-// 		mainInspecting := false
-// 		// функцией ast.Inspect проходим по всем узлам AST
-// 		ast.Inspect(file, func(node ast.Node) bool {
-// 			switch x := node.(type) {
-// 			case *ast.File: // package
-// 				if !isMainPkg(x) { // если пакет на main - выходим
-// 					return true
-// 				}
-// 			case *ast.FuncDecl: // определение функции
-// 				f := isMainFunc(x)
-// 				if mainInspecting && !f { // если до этого инспектировали main, а теперь нет - можно заканчивать
-// 					return true
-// 				}
-// 				mainInspecting = f
-// 			case *ast.SelectorExpr: // вызова функции
-// 				if isOsExit(x, mainInspecting) {
-// 					return true
-// 				}
-// 			}
-// 			return true
-// 		})
-// 	}
-// 	return nil, nil
-// }
 
 func appendPasses(in []*analysis.Analyzer) []*analysis.Analyzer {
 	passes := []*analysis.Analyzer{

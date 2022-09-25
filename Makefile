@@ -21,6 +21,13 @@ FILE_STORAGE_PATH=./test/data/test.tst
 DATABASE_DSN="postgres://postgres:postgres@localhost:5432/ya_pract?sslmode=disable"
 DATABASE_DSN_DOCKER="postgres://postgres:postgres@$(DOCKER_HOST):5432/ya_pract?sslmode=disable"
 
+gen:
+	@echo "  >  Generating code for $(GOBASE)/..."
+	@go generate $(GOBASE)/...
+
+doc:
+	@godoc -http=:8081 & open http://localhost:8081/pkg/?m=all
+
 tests:
 	@echo "  >  Running tests for $(GOBASE)/..."
 	@go test $(GOBASE)/...
@@ -36,7 +43,7 @@ check:
 
 lint: lint-build
 	@echo "  >  Running $(LINT) for $(GOBASE)/..."
-	@$(GOBIN)/$(LINT) $(GOBASE)/...
+	@$(GOBIN)/$(LINT) -help $(GOBASE)/...
 
 lint-build:
 	@echo "  >  Building linters $(GOBASE)/$(LINT_PATH)"
