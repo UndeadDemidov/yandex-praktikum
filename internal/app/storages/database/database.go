@@ -43,7 +43,7 @@ const (
    						 WHERE NOT EXISTS (SELECT 1 FROM inserted_rows)
    						   AND original_url=$3;`
 	restoreQuery    = `SELECT original_url, is_deleted FROM shortened_urls WHERE id=$1`
-	deleteStatement = `UPDATE shortened_urls SET is_deleted=true WHERE user_id=$1 AND id=$2`
+	deleteStatement = `UPDATE shortened_urls SET is_deleted=TRUE WHERE user_id=$1 AND id=$2`
 	userBucketQuery = `SELECT id, original_url FROM shortened_urls WHERE user_id=$1`
 
 	batchSize = 10
@@ -301,7 +301,7 @@ func (s *Storage) StoreBatch(ctx context.Context, user string, batchIn map[strin
 	// шаг 1.1 — если возникает ошибка, откатываем изменения
 	defer func() {
 		if err = tx.Rollback(); err != nil {
-			log.Err(err)
+			log.Err(err).Msg("can't rollback transaction")
 		}
 	}()
 
@@ -313,7 +313,7 @@ func (s *Storage) StoreBatch(ctx context.Context, user string, batchIn map[strin
 	// шаг 2.1 — не забываем закрыть инструкцию, когда она больше не нужна
 	defer func() {
 		if err = query.Close(); err != nil {
-			log.Err(err)
+			log.Err(err).Msg("can't close query instruction")
 		}
 	}()
 
@@ -349,12 +349,14 @@ func (s *Storage) StoreBatch(ctx context.Context, user string, batchIn map[strin
 	// шаг 4 — сохраняем изменения
 	err = tx.Commit()
 	if err != nil {
+		log.Err(err).Msg("can't commit transaction")
 		return nil, err
 	}
 
 	if conflict {
 		err = handlers.ErrLinkIsAlreadyShortened
 	}
+	log.Debug().Msg("batch is processed properly")
 	return batchOut, err // err либо nil, либо ErrLinkIsAlreadyShortened
 }
 
