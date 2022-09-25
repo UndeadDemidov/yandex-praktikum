@@ -292,7 +292,7 @@ func (s *Storage) GetUserStorage(ctx context.Context, user string) map[string]st
 
 // StoreBatch сохраняет пакет ссылок из map[correlation_id]original_link и возвращает map[correlation_id]short_link.
 // В случае конфликта c уже ранее сохраненным link возвращает ошибку handlers.ErrLinkIsAlreadyShortened и id с раннего сохранения.
-func (s *Storage) StoreBatch(ctx context.Context, user string, batchIn map[string]string) (batchOut map[string]string, err error) {
+func (s *Storage) StoreBatch(ctx context.Context, user string, batchIn map[string]string) (map[string]string, error) {
 	// шаг 1 — объявляем транзакцию
 	tx, err := s.database.Begin()
 	if err != nil {
@@ -317,7 +317,7 @@ func (s *Storage) StoreBatch(ctx context.Context, user string, batchIn map[strin
 		}
 	}()
 
-	batchOut = make(map[string]string)
+	batchOut := make(map[string]string)
 	conflict := false
 	for corrID, link := range batchIn {
 		// шаг 3 — указываем, что каждый элемент будет добавлен в транзакцию
