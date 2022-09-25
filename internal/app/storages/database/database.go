@@ -187,7 +187,7 @@ func (s *Storage) unstoreConsume() {
 				log.Debug().Msg(fmt.Sprint(buf[:i]))
 				err := s.unstoreBatch(buf[:i])
 				if err != nil {
-					log.Err(err)
+					log.Err(err).Send()
 				}
 				i = 0
 			}
@@ -199,7 +199,7 @@ func (s *Storage) unstoreConsume() {
 				log.Debug().Msg(fmt.Sprint(buf))
 				err := s.unstoreBatch(buf)
 				if err != nil {
-					log.Err(err)
+					log.Err(err).Send()
 				}
 				i = 0
 			}
@@ -218,7 +218,7 @@ func (s *Storage) unstoreBatch(ids []userID) error {
 	// шаг 1.1 — если возникает ошибка, откатываем изменения
 	defer func() {
 		if err = tx.Rollback(); err != nil {
-			log.Err(err)
+			log.Err(err).Send()
 		}
 	}()
 
@@ -233,7 +233,7 @@ func (s *Storage) unstoreBatch(ids []userID) error {
 	// шаг 2.1 — не забываем закрыть инструкцию, когда она больше не нужна
 	defer func() {
 		if err = stmt.Close(); err != nil {
-			log.Err(err)
+			log.Err(err).Send()
 		}
 	}()
 
@@ -257,13 +257,13 @@ func (s *Storage) unstoreBatch(ids []userID) error {
 func (s *Storage) GetUserStorage(ctx context.Context, user string) map[string]string {
 	rows, err := s.database.QueryContext(ctx, userBucketQuery, user)
 	if err != nil {
-		log.Err(err)
+		log.Err(err).Send()
 		return map[string]string{}
 	}
 	defer func() {
 		err = rows.Close()
 		if err != nil {
-			log.Err(err)
+			log.Err(err).Send()
 		}
 	}()
 
@@ -275,7 +275,7 @@ func (s *Storage) GetUserStorage(ctx context.Context, user string) map[string]st
 		)
 		err = rows.Scan(&id, &originalURL)
 		if err != nil {
-			log.Err(err)
+			log.Err(err).Send()
 			return map[string]string{}
 		}
 		m[id] = originalURL
@@ -283,7 +283,7 @@ func (s *Storage) GetUserStorage(ctx context.Context, user string) map[string]st
 
 	err = rows.Err()
 	if err != nil {
-		log.Err(err)
+		log.Err(err).Send()
 		return map[string]string{}
 	}
 
@@ -301,7 +301,7 @@ func (s *Storage) StoreBatch(ctx context.Context, user string, batchIn map[strin
 	// шаг 1.1 — если возникает ошибка, откатываем изменения
 	defer func() {
 		if err = tx.Rollback(); err != nil {
-			log.Err(err).Msg("can't rollback transaction")
+			log.Debug().Err(err).Msg("can't rollback transaction, this error will be omitted")
 		}
 	}()
 
@@ -313,7 +313,7 @@ func (s *Storage) StoreBatch(ctx context.Context, user string, batchIn map[strin
 	// шаг 2.1 — не забываем закрыть инструкцию, когда она больше не нужна
 	defer func() {
 		if err = query.Close(); err != nil {
-			log.Err(err).Msg("can't close query instruction")
+			log.Err(err).Msg("can't close query instruction, this error will be omitted")
 		}
 	}()
 

@@ -15,7 +15,7 @@ import (
 )
 
 func init() {
-	zerolog.SetGlobalLevel(zerolog.DebugLevel)
+	zerolog.SetGlobalLevel(zerolog.InfoLevel)
 	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
 
 	pflag.StringP("base-url", "b", "http://localhost:8080/", "sets base URL for shortened link")
