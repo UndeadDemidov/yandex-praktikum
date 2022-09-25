@@ -59,5 +59,5 @@ func CreateShortID(ctx context.Context, isExist func(context.Context, string) bo
 
 func InternalServerError(w http.ResponseWriter, err error) {
 	http.Error(w, err.Error(), http.StatusInternalServerError)
-	log.Error().Err(err)
+	log.Error().Err(err).Send()
 }

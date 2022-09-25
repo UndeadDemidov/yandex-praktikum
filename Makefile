@@ -86,6 +86,7 @@ start-mem:
 	docker run --rm --name $(PROJECT) \
 	-e BASE_URL=$(BASE_URL) \
 	-e SERVER_ADDRESS=$(SERVER_ADDRESS) \
+	-p $(HTTP_PORT):$(HTTP_PORT_EXPOSE)/tcp -p $(HTTP_PORT):$(HTTP_PORT_EXPOSE)/udp \
 	$(IMAGENAME)
 
 start-file:
@@ -93,6 +94,7 @@ start-file:
 	-e BASE_URL=$(BASE_URL) \
 	-e SERVER_ADDRESS=$(SERVER_ADDRESS) \
 	-e FILE_STORAGE_PATH=$(FILE_STORAGE_PATH) \
+	-p $(HTTP_PORT):$(HTTP_PORT_EXPOSE)/tcp -p $(HTTP_PORT):$(HTTP_PORT_EXPOSE)/udp \
 	$(IMAGENAME)
 
 start-db:
