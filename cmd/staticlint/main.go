@@ -59,15 +59,8 @@ func main() {
 			mychecks = append(mychecks, v.Analyzer)
 		}
 	}
-	mychecks = appendPasses(mychecks)
-	mychecks = append(mychecks, errwrap.Analyzer)
-	mychecks = append(mychecks, goone.Analyzer)
-	mychecks = append(mychecks, linter.ExitInMainAnalyzer)
-	multichecker.Main(mychecks...)
-}
-
-func appendPasses(in []*analysis.Analyzer) []*analysis.Analyzer {
-	passes := []*analysis.Analyzer{
+	mychecks = append(mychecks,
+		// all linters from golang.org/x/tools/go/analysis/passes
 		asmdecl.Analyzer,
 		assign.Analyzer,
 		atomic.Analyzer,
@@ -107,6 +100,11 @@ func appendPasses(in []*analysis.Analyzer) []*analysis.Analyzer {
 		unsafeptr.Analyzer,
 		unusedresult.Analyzer,
 		unusedwrite.Analyzer,
-	}
-	return append(in, passes...)
+		// two external linters
+		errwrap.Analyzer,
+		goone.Analyzer,
+		// my own linter
+		linter.ExitInMainAnalyzer,
+	)
+	multichecker.Main(mychecks...)
 }
