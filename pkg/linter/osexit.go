@@ -1,7 +1,7 @@
-// This linter checks the call os.Exit function from main and warns if such call will be found.
+// Package linter contains linter that checks the call os.Exit function from main and warns if such call will be found.
 // It can be called from multichecker.Main(...*analysis.Analyzer) of golang.org/x/tools/go/analysis/multichecker
-//  multichecker.Main(linter.ExitInMainAnalyzer)
-
+//
+//	multichecker.Main(linter.ExitInMainAnalyzer)
 package linter
 
 import (
