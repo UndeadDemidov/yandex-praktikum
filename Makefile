@@ -33,11 +33,11 @@ gen:
 doc:
 	@godoc -http=:8081 & open http://localhost:8081/pkg/?m=all
 
-tests:
+tests: gen
 	@echo "  >  Running tests for $(GOBASE)/..."
 	@go test $(GOBASE)/...
 
-cover:
+cover: gen
 	@echo "  >  Running coverage for $(GOBASE)/..."
 	@go test -coverprofile cover.out $(GOBASE)/...
 	@go tool cover -html=cover.out

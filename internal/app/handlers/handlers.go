@@ -13,8 +13,11 @@ import (
 	midware "github.com/UndeadDemidov/yandex-praktikum/internal/app/middleware"
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
 	"github.com/go-chi/chi/v5"
+	_ "github.com/golang/mock/mockgen/model"
 	"github.com/rs/zerolog/log"
 )
+
+//go:generate mockgen -destination=./mocks/mock_repository.go . Repository
 
 var (
 	ErrLinkIsAlreadyShortened = errors.New("link is already shortened")

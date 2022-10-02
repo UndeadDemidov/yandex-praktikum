@@ -5,6 +5,8 @@ go 1.18
 require (
 	github.com/fatih/errwrap v1.4.0
 	github.com/go-chi/chi/v5 v5.0.7
+	github.com/go-chi/httplog v0.2.5
+	github.com/golang/mock v1.4.4
 	github.com/google/uuid v1.1.2
 	github.com/lib/pq v1.10.6
 	github.com/masibw/goone v1.4.1
@@ -21,7 +23,6 @@ require (
 	github.com/BurntSushi/toml v0.4.1 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/fsnotify/fsnotify v1.5.1 // indirect
-	github.com/go-chi/httplog v0.2.5 // indirect
 	github.com/gostaticanalysis/analysisutil v0.6.1 // indirect
 	github.com/gostaticanalysis/comment v1.4.1 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
