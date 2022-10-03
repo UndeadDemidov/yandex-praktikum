@@ -77,11 +77,11 @@ func GetUserID(ctx context.Context) string {
 
 type SignedCookie struct {
 	*http.Cookie
-	SaltStartIdx uint
-	SaltEndIdx   uint
+	BaseValue    string
 	key          []byte
 	sign         []byte
-	BaseValue    string
+	SaltStartIdx uint
+	SaltEndIdx   uint
 }
 
 func NewUserIDSignedCookie() (sc SignedCookie) {

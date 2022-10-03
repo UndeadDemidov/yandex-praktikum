@@ -2,7 +2,6 @@ package main
 
 import (
 	"database/sql"
-	"os"
 	"strings"
 
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/storages/database"
@@ -16,7 +15,7 @@ import (
 
 func init() {
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr})
+	log.Logger = log.With().Caller().Logger()
 
 	pflag.StringP("base-url", "b", "http://localhost:8080/", "sets base URL for shortened link")
 	pflag.StringP("server-address", "a", ":8080", "sets address of service server")

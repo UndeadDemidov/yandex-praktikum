@@ -8,6 +8,8 @@ import (
 	midware "github.com/UndeadDemidov/yandex-praktikum/internal/app/middleware"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/httplog"
+	"github.com/rs/zerolog/log"
 )
 
 // NewServer создает и возвращает новый сервер с указанным репозиторием коротких ссылок
@@ -17,10 +19,8 @@ func NewServer(baseURL string, addr string, repo handlers.Repository) *http.Serv
 
 	r := chi.NewRouter()
 	r.Use(middleware.Heartbeat("/health"))
-	r.Use(middleware.RequestID)
 	r.Use(middleware.RealIP)
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
+	r.Use(httplog.RequestLogger(log.Logger))
 
 	r.Use(midware.Decompress)
 	r.Use(midware.UserCookie)

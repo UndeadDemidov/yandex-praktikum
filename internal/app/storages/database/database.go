@@ -19,16 +19,16 @@ const (
 				   WHERE table_schema = 'public'
 					 AND table_type = 'BASE TABLE'
 					 AND table_name = 'shortened_urls'`
-	createDBStatement = `create table shortened_urls
+	createDBStatement = `CREATE TABLE shortened_urls
 						(
-						    id           VARCHAR not null constraint shortened_urls_pk primary key,
-						    user_id      uuid    not null,
-						    original_url VARCHAR not null,
-						    is_deleted   BOOLEAN not null default false
+						    id           VARCHAR NOT NULL CONSTRAINT shortened_urls_pk PRIMARY KEY,
+						    user_id      uuid    NOT NULL,
+						    original_url VARCHAR NOT NULL,
+						    is_deleted   BOOLEAN NOT NULL DEFAULT FALSE
 						);
-						create unique index shortened_urls_id_uindex on shortened_urls (id);
-						create unique index shortened_urls_original_url_uindex on shortened_urls (original_url);
-						create index shortened_urls_user_id on shortened_urls (user_id);`
+						CREATE UNIQUE INDEX shortened_urls_id_uindex ON shortened_urls (id);
+						CREATE UNIQUE INDEX shortened_urls_original_url_uindex ON shortened_urls (original_url);
+						CREATE INDEX shortened_urls_user_id ON shortened_urls (user_id);`
 	// Как говорит великий Том Кайт - если можно сделать одним SQL statement - сделай это!
 	// Если original_url уже есть, то возвращается его ID (независимо от user_id),
 	// Если original_url еще нет, то возвращается пустой row set
@@ -40,10 +40,10 @@ const (
 					  )
 						SELECT id
 						FROM shortened_urls
-   						 WHERE NOT exists (SELECT 1 FROM inserted_rows)
+   						 WHERE NOT EXISTS (SELECT 1 FROM inserted_rows)
    						   AND original_url=$3;`
 	restoreQuery    = `SELECT original_url, is_deleted FROM shortened_urls WHERE id=$1`
-	deleteStatement = `UPDATE shortened_urls SET is_deleted=true WHERE user_id=$1 AND id=$2`
+	deleteStatement = `UPDATE shortened_urls SET is_deleted=TRUE WHERE user_id=$1 AND id=$2`
 	userBucketQuery = `SELECT id, original_url FROM shortened_urls WHERE user_id=$1`
 
 	batchSize = 10
@@ -187,7 +187,7 @@ func (s *Storage) unstoreConsume() {
 				log.Debug().Msg(fmt.Sprint(buf[:i]))
 				err := s.unstoreBatch(buf[:i])
 				if err != nil {
-					log.Err(err)
+					log.Err(err).Send()
 				}
 				i = 0
 			}
@@ -199,7 +199,7 @@ func (s *Storage) unstoreConsume() {
 				log.Debug().Msg(fmt.Sprint(buf))
 				err := s.unstoreBatch(buf)
 				if err != nil {
-					log.Err(err)
+					log.Err(err).Send()
 				}
 				i = 0
 			}
@@ -217,8 +217,8 @@ func (s *Storage) unstoreBatch(ids []userID) error {
 	}
 	// шаг 1.1 — если возникает ошибка, откатываем изменения
 	defer func() {
-		if err := tx.Rollback(); err != nil {
-			log.Err(err)
+		if err = tx.Rollback(); err != nil {
+			log.Err(err).Send()
 		}
 	}()
 
@@ -232,8 +232,8 @@ func (s *Storage) unstoreBatch(ids []userID) error {
 	}
 	// шаг 2.1 — не забываем закрыть инструкцию, когда она больше не нужна
 	defer func() {
-		if err := stmt.Close(); err != nil {
-			log.Err(err)
+		if err = stmt.Close(); err != nil {
+			log.Err(err).Send()
 		}
 	}()
 
@@ -257,13 +257,13 @@ func (s *Storage) unstoreBatch(ids []userID) error {
 func (s *Storage) GetUserStorage(ctx context.Context, user string) map[string]string {
 	rows, err := s.database.QueryContext(ctx, userBucketQuery, user)
 	if err != nil {
-		log.Err(err)
+		log.Err(err).Send()
 		return map[string]string{}
 	}
 	defer func() {
-		err := rows.Close()
+		err = rows.Close()
 		if err != nil {
-			log.Err(err)
+			log.Err(err).Send()
 		}
 	}()
 
@@ -275,7 +275,7 @@ func (s *Storage) GetUserStorage(ctx context.Context, user string) map[string]st
 		)
 		err = rows.Scan(&id, &originalURL)
 		if err != nil {
-			log.Err(err)
+			log.Err(err).Send()
 			return map[string]string{}
 		}
 		m[id] = originalURL
@@ -283,7 +283,7 @@ func (s *Storage) GetUserStorage(ctx context.Context, user string) map[string]st
 
 	err = rows.Err()
 	if err != nil {
-		log.Err(err)
+		log.Err(err).Send()
 		return map[string]string{}
 	}
 
@@ -292,7 +292,7 @@ func (s *Storage) GetUserStorage(ctx context.Context, user string) map[string]st
 
 // StoreBatch сохраняет пакет ссылок из map[correlation_id]original_link и возвращает map[correlation_id]short_link.
 // В случае конфликта c уже ранее сохраненным link возвращает ошибку handlers.ErrLinkIsAlreadyShortened и id с раннего сохранения.
-func (s *Storage) StoreBatch(ctx context.Context, user string, batchIn map[string]string) (batchOut map[string]string, err error) {
+func (s *Storage) StoreBatch(ctx context.Context, user string, batchIn map[string]string) (map[string]string, error) {
 	// шаг 1 — объявляем транзакцию
 	tx, err := s.database.Begin()
 	if err != nil {
@@ -300,8 +300,8 @@ func (s *Storage) StoreBatch(ctx context.Context, user string, batchIn map[strin
 	}
 	// шаг 1.1 — если возникает ошибка, откатываем изменения
 	defer func() {
-		if err := tx.Rollback(); err != nil {
-			log.Err(err)
+		if err = tx.Rollback(); err != nil {
+			log.Debug().Err(err).Msg("can't rollback transaction, this error will be omitted")
 		}
 	}()
 
@@ -312,12 +312,12 @@ func (s *Storage) StoreBatch(ctx context.Context, user string, batchIn map[strin
 	}
 	// шаг 2.1 — не забываем закрыть инструкцию, когда она больше не нужна
 	defer func() {
-		if err := query.Close(); err != nil {
-			log.Err(err)
+		if err = query.Close(); err != nil {
+			log.Err(err).Msg("can't close query instruction, this error will be omitted")
 		}
 	}()
 
-	batchOut = make(map[string]string)
+	batchOut := make(map[string]string)
 	conflict := false
 	for corrID, link := range batchIn {
 		// шаг 3 — указываем, что каждый элемент будет добавлен в транзакцию
@@ -349,12 +349,14 @@ func (s *Storage) StoreBatch(ctx context.Context, user string, batchIn map[strin
 	// шаг 4 — сохраняем изменения
 	err = tx.Commit()
 	if err != nil {
+		log.Err(err).Msg("can't commit transaction")
 		return nil, err
 	}
 
 	if conflict {
 		err = handlers.ErrLinkIsAlreadyShortened
 	}
+	log.Debug().Msg("batch is processed properly")
 	return batchOut, err // err либо nil, либо ErrLinkIsAlreadyShortened
 }
 

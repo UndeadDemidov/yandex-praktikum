@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -62,7 +62,7 @@ func TestURLShortenerHandler_HandlePost(t *testing.T) {
 			h.HandlePostShortenPlain(w, request)
 			result := w.Result()
 
-			urlResult, err := ioutil.ReadAll(result.Body)
+			urlResult, err := io.ReadAll(result.Body)
 			require.NoError(t, err)
 			err = result.Body.Close()
 			require.NoError(t, err)
@@ -76,14 +76,14 @@ func TestURLShortenerHandler_HandlePost(t *testing.T) {
 //nolint:funlen
 func TestURLShortenerHandler_HandlePostShorten(t *testing.T) {
 	type want struct {
-		status  int
 		wantErr assert.ErrorAssertionFunc
+		status  int
 	}
 	tests := []struct {
+		want     want
 		name     string
 		reqBody  string
 		respBody string
-		want     want
 	}{
 		{
 			name:    "valid request",
@@ -146,8 +146,8 @@ func TestURLShortenerHandler_HandleGet(t *testing.T) {
 		repo RepoMock
 	}
 	type want struct {
-		status   int
 		location string
+		status   int
 	}
 	tests := []struct {
 		name  string
@@ -241,7 +241,7 @@ func ExampleURLShortener_HandlePostShortenPlain() {
 	h.HandlePostShortenPlain(w, request)
 	result := w.Result()
 
-	urlResult, err := ioutil.ReadAll(result.Body)
+	urlResult, err := io.ReadAll(result.Body)
 	if err != nil {
 		panic(err)
 	}

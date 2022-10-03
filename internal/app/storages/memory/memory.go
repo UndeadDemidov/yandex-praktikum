@@ -13,8 +13,8 @@ import (
 // Storage реализует хранение ссылок в памяти.
 // Является потоко безопасной реализацией Repository
 type Storage struct {
-	mx      sync.Mutex
 	storage map[string]map[string]string
+	mx      sync.Mutex
 }
 
 var _ handlers.Repository = (*Storage)(nil)

@@ -2,7 +2,6 @@ package utils
 
 import (
 	"context"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"os"
@@ -27,7 +26,7 @@ func CheckFilename(filename string) (err error) {
 
 	// Attempt to create it
 	var d []byte
-	if err = ioutil.WriteFile(filename, d, 0644); err == nil { //nolint:gosec
+	if err = os.WriteFile(filename, d, 0644); err == nil {
 		err = os.Remove(filename) // And delete it
 		if err != nil {
 			return err
@@ -60,5 +59,5 @@ func CreateShortID(ctx context.Context, isExist func(context.Context, string) bo
 
 func InternalServerError(w http.ResponseWriter, err error) {
 	http.Error(w, err.Error(), http.StatusInternalServerError)
-	log.Error().Err(err)
+	log.Error().Err(err).Send()
 }
