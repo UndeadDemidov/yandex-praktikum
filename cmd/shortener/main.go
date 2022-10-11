@@ -52,12 +52,14 @@ func Run(srv *http.Server) {
 		)
 		var err error
 		if config.EnableHttps {
+			log.Info().Msg("https enabled")
 			err = utils.CreateTLSCert(cert, key)
 			if err != nil {
 				log.Fatal().Msgf("cert creation: %+v\n", err)
 			}
 			err = srv.ListenAndServeTLS(cert, key)
 		} else {
+			log.Info().Msg("https is not enabled")
 			err = srv.ListenAndServe()
 		}
 		if err != nil && err != http.ErrServerClosed {
