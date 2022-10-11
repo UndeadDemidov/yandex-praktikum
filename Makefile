@@ -48,7 +48,7 @@ check:
 
 lint: lint-build
 	@echo "  >  Running $(LINT) for $(GOBASE)/..."
-	@$(GOBIN)/$(LINT) -help $(GOBASE)/...
+	@$(GOBIN)/$(LINT) $(GOBASE)/...
 
 lint-build:
 	@echo "  >  Building linters $(GOBASE)/$(LINT_PATH)"
@@ -77,7 +77,7 @@ go-run-db:
 	BASE_URL=$(BASE_URL) \
 	SERVER_ADDRESS=$(SERVER_ADDRESS) \
 	DATABASE_DSN=$(DATABASE_DSN) \
-	go run $(LDFLAGS) ./$(MAIN_PATH)
+	go run $(LDFLAGS) ./$(MAIN_PATH) -s
 
 build:
 	@docker build \

@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"os"
 	"strings"
 
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/storages/database"
@@ -15,12 +16,13 @@ import (
 
 func init() {
 	zerolog.SetGlobalLevel(zerolog.InfoLevel)
-	log.Logger = log.With().Caller().Logger()
+	log.Logger = log.Output(zerolog.ConsoleWriter{Out: os.Stderr}).With().Caller().Logger()
 
 	pflag.StringP("base-url", "b", "http://localhost:8080/", "sets base URL for shortened link")
 	pflag.StringP("server-address", "a", ":8080", "sets address of service server")
 	pflag.StringP("file-storage-path", "f", "", "sets path for file storage")
 	pflag.StringP("database-dsn", "d", "", "sets connection string for postgres DB")
+	pflag.BoolP("enable-https", "s", false, "enable https protocol")
 	pflag.Parse()
 	err := viper.BindPFlags(pflag.CommandLine)
 	if err != nil {

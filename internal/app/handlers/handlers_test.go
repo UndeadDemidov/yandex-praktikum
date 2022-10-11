@@ -526,3 +526,238 @@ func TestURLShortener_HandleGetUserURLsBucket(t *testing.T) {
 		})
 	}
 }
+
+func TestURLShortener_HandlePostShortenBatch(t *testing.T) {
+	type fields struct {
+		repo *mock_handlers.MockRepository
+	}
+	type want struct {
+		status int
+		result string
+	}
+	tests := []struct {
+		name    string
+		reqBody string
+		want    want
+		prepare func(f *fields)
+	}{
+		{
+			name:    "empty body",
+			reqBody: "",
+			want:    want{status: http.StatusBadRequest, result: "proper JSON request is expected\n"},
+			prepare: nil,
+		},
+		{
+			name: "single item",
+			reqBody: `
+[
+  {
+    "correlation_id": "xxxx",
+    "original_url": "https://ya.ru"
+  }
+]
+`,
+			want: want{
+				status: http.StatusCreated,
+				result: `
+[
+   {
+     "correlation_id": "xxxx",
+     "short_url": "http://localhost:8080/1111"
+   }
+ ]
+`,
+			},
+			prepare: func(f *fields) {
+				gomock.InOrder(
+					f.repo.EXPECT().StoreBatch(gomock.Any(), gomock.Any(), gomock.Any()).
+						Return(map[string]string{"xxxx": "1111"}, nil),
+				)
+			},
+		},
+		{
+			name: "couple items",
+			reqBody: `
+[
+  {
+    "correlation_id": "xxxx",
+    "original_url": "https://ya.ru"
+  },
+  {
+    "correlation_id": "yyyy",
+    "original_url": "https://yandex.ru"
+  }
+]
+`,
+			want: want{
+				status: http.StatusCreated,
+				result: `
+[
+   {
+     "correlation_id": "xxxx",
+     "short_url": "http://localhost:8080/1111"
+   },
+   {
+     "correlation_id": "yyyy",
+     "short_url": "http://localhost:8080/2222"
+   }
+ ]
+`,
+			},
+			prepare: func(f *fields) {
+				gomock.InOrder(
+					f.repo.EXPECT().StoreBatch(gomock.Any(), gomock.Any(), gomock.Any()).
+						Return(map[string]string{"xxxx": "1111", "yyyy": "2222"}, nil),
+				)
+			},
+		},
+		{
+			name: "already shortened",
+			reqBody: `
+[
+  {
+    "correlation_id": "xxxx",
+    "original_url": "https://ya.ru"
+  }
+]
+`,
+			want: want{
+				status: http.StatusConflict,
+				result: `
+[
+   {
+     "correlation_id": "xxxx",
+     "short_url": "http://localhost:8080/1111"
+   }
+ ]
+`,
+			},
+			prepare: func(f *fields) {
+				gomock.InOrder(
+					f.repo.EXPECT().StoreBatch(gomock.Any(), gomock.Any(), gomock.Any()).
+						Return(map[string]string{"xxxx": "1111"}, ErrLinkIsAlreadyShortened),
+				)
+			},
+		},
+		{
+			name: "internal server error",
+			reqBody: `
+[
+  {
+    "correlation_id": "xxxx",
+    "original_url": "https://ya.ru"
+  }
+]
+`,
+			want: want{
+				status: http.StatusInternalServerError,
+				result: fmt.Sprintf("%s\n", dumbError.Error()),
+			},
+			prepare: func(f *fields) {
+				gomock.InOrder(
+					f.repo.EXPECT().StoreBatch(gomock.Any(), gomock.Any(), gomock.Any()).
+						Return(map[string]string{}, dumbError),
+				)
+			},
+		},
+	}
+	zerolog.SetGlobalLevel(zerolog.Disabled)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			mockRepo := mock_handlers.NewMockRepository(mockCtrl)
+
+			f := fields{
+				repo: mockRepo,
+			}
+			if tt.prepare != nil {
+				tt.prepare(&f)
+			}
+
+			reader := strings.NewReader(tt.reqBody)
+			request := httptest.NewRequest(http.MethodPost, "/", reader)
+			w := httptest.NewRecorder()
+			h := NewURLShortener(baseURL, mockRepo)
+			h.HandlePostShortenBatch(w, request)
+			result := w.Result()
+			assert.Equal(t, tt.want.status, result.StatusCode)
+
+			buf := new(bytes.Buffer)
+			_, err := buf.ReadFrom(result.Body)
+			require.NoError(t, err)
+			if tt.want.result == "" || buf.String() == "" ||
+				tt.want.status == http.StatusBadRequest ||
+				tt.want.status == http.StatusInternalServerError {
+				assert.EqualValues(t, tt.want.result, buf.String())
+			} else {
+				assert.JSONEq(t, tt.want.result, buf.String())
+			}
+			err = result.Body.Close()
+			require.NoError(t, err)
+		})
+	}
+}
+
+func TestURLShortener_HeartBeat(t *testing.T) {
+	type fields struct {
+		repo *mock_handlers.MockRepository
+	}
+	type want struct {
+		status int
+		result string
+	}
+	tests := []struct {
+		name    string
+		want    want
+		prepare func(f *fields)
+	}{
+		{
+			name: "ok",
+			want: want{status: http.StatusOK, result: "I'm alive (c)Helloween"},
+			prepare: func(f *fields) {
+				gomock.InOrder(
+					f.repo.EXPECT().Ping(gomock.Any()).Return(nil),
+				)
+			},
+		},
+		{
+			name: "not ok",
+			want: want{status: http.StatusInternalServerError, result: "dumb error\n"},
+			prepare: func(f *fields) {
+				gomock.InOrder(
+					f.repo.EXPECT().Ping(gomock.Any()).Return(dumbError),
+				)
+			},
+		},
+	}
+	zerolog.SetGlobalLevel(zerolog.Disabled)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			mockRepo := mock_handlers.NewMockRepository(mockCtrl)
+
+			f := fields{
+				repo: mockRepo,
+			}
+			if tt.prepare != nil {
+				tt.prepare(&f)
+			}
+
+			request := httptest.NewRequest(http.MethodGet, "/", nil)
+			w := httptest.NewRecorder()
+			h := NewURLShortener(baseURL, mockRepo)
+			h.HeartBeat(w, request)
+			result := w.Result()
+			assert.Equal(t, tt.want.status, result.StatusCode)
+
+			buf := new(bytes.Buffer)
+			_, err := buf.ReadFrom(result.Body)
+			require.NoError(t, err)
+			assert.EqualValues(t, tt.want.result, buf.String())
+			err = result.Body.Close()
+			require.NoError(t, err)
+		})
+	}
+}

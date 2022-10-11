@@ -11,6 +11,7 @@ import (
 
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/server"
+	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
 	_ "github.com/lib/pq"
 	"github.com/rs/zerolog/log"
 	"github.com/spf13/viper"
@@ -44,7 +45,21 @@ func Run(srv *http.Server) {
 	defer stop()
 
 	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		const (
+			cert = "cert.pem"
+			key  = "key.pem"
+		)
+		var err error
+		if viper.GetBool("enable-https") {
+			err = utils.CreateTLSCert(cert, key)
+			if err != nil {
+				log.Fatal().Msgf("cert creation: %+v\n", err)
+			}
+			err = srv.ListenAndServeTLS(cert, key)
+		} else {
+			err = srv.ListenAndServe()
+		}
+		if err != nil && err != http.ErrServerClosed {
 			log.Fatal().Msgf("listen: %+v\n", err)
 		}
 	}()
