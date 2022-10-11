@@ -42,7 +42,7 @@ func CreateServer() *http.Server {
 
 // Run запускает сервер с указанным репозиторием и реализуем graceful shutdown
 func Run(srv *http.Server) {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	defer stop()
 
 	go func() {
