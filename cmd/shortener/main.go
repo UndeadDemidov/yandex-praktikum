@@ -58,11 +58,10 @@ func Run(srv *http.Server) {
 				log.Fatal().Msgf("cert creation: %+v\n", err)
 			}
 			err = srv.ListenAndServeTLS(cert, key)
-			if err != nil && err != http.ErrServerClosed {
-				log.Fatal().Msgf("listen: %+v\n", err)
-			}
+		} else {
+			log.Info().Msg("https is not enabled")
+			err = srv.ListenAndServe()
 		}
-		err = srv.ListenAndServe()
 		if err != nil && err != http.ErrServerClosed {
 			log.Fatal().Msgf("listen: %+v\n", err)
 		}

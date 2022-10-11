@@ -73,10 +73,10 @@ func (c *Config) loadConfigFromFile(filepath string) {
 }
 
 func (c *Config) expandConfigFromFlags() {
-	if viper.GetString("base-url") != defaultBaseURL {
+	if viper.GetString("base-url") != defaultBaseURL || c.BaseUrl == "" {
 		c.BaseUrl = viper.GetString("base-url")
 	}
-	if viper.GetString("server-address") != defaultServerAddress {
+	if viper.GetString("server-address") != defaultServerAddress || c.ServerAddress == "" {
 		c.ServerAddress = viper.GetString("server-address")
 	}
 	if viper.GetString("file-storage-path") != "" {
