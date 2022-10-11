@@ -9,12 +9,12 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/UndeadDemidov/yandex-praktikum/cfg"
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers"
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/server"
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
 	_ "github.com/lib/pq"
 	"github.com/rs/zerolog/log"
-	"github.com/spf13/viper"
 )
 
 var (
@@ -22,6 +22,7 @@ var (
 	buildDate    string = "N/A"
 	buildCommit  string = "N/A"
 	repo         handlers.Repository
+	config       *cfg.Config
 )
 
 func main() {
@@ -36,7 +37,7 @@ func main() {
 // CreateServer создает сервер и возвращает его и репозиторий.
 // Можно заменить параметры на глобальные переменные, вроде как от этого ничего плохого не будет.
 func CreateServer() *http.Server {
-	return server.NewServer(viper.GetString("base-url"), viper.GetString("server-address"), repo)
+	return server.NewServer(config.BaseUrl, config.ServerAddress, repo)
 }
 
 // Run запускает сервер с указанным репозиторием и реализуем graceful shutdown
@@ -50,7 +51,7 @@ func Run(srv *http.Server) {
 			key  = "key.pem"
 		)
 		var err error
-		if viper.GetBool("enable-https") {
+		if config.EnableHttps {
 			err = utils.CreateTLSCert(cert, key)
 			if err != nil {
 				log.Fatal().Msgf("cert creation: %+v\n", err)

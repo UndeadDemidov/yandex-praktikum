@@ -79,6 +79,10 @@ go-run-db:
 	DATABASE_DSN=$(DATABASE_DSN) \
 	go run $(LDFLAGS) ./$(MAIN_PATH) -s
 
+go-run-cfg:
+	@GOBIN=$(GOBIN) \
+	go run $(LDFLAGS) ./$(MAIN_PATH) -c shortener.json
+
 build:
 	@docker build \
 	--build-arg APP=$(PROJECT) \
