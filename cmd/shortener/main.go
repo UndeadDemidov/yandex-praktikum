@@ -41,6 +41,7 @@ func CreateServer() *http.Server {
 }
 
 // Run запускает сервер с указанным репозиторием и реализуем graceful shutdown
+// Более читаемый вариант: https://github.com/rudderlabs/graceful-shutdown-examples/blob/main/httpserver/main.go
 func Run(srv *http.Server) {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	defer stop()
@@ -52,21 +53,21 @@ func Run(srv *http.Server) {
 		)
 		var err error
 		if config.EnableHttps {
-			log.Info().Msg("https enabled")
+			log.Info().Msg("HTTPS enabled")
 			err = utils.CreateTLSCert(cert, key)
 			if err != nil {
 				log.Fatal().Msgf("cert creation: %+v\n", err)
 			}
 			err = srv.ListenAndServeTLS(cert, key)
 		} else {
-			log.Info().Msg("https is not enabled")
+			log.Info().Msg("HTTPS is not enabled")
 			err = srv.ListenAndServe()
 		}
 		if err != nil && err != http.ErrServerClosed {
 			log.Fatal().Msgf("listen: %+v\n", err)
 		}
+		log.Info().Msg("Server started")
 	}()
-	log.Info().Msg("Server started")
 
 	<-ctx.Done()
 
