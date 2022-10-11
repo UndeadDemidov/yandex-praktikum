@@ -23,7 +23,7 @@ import (
 
 const baseURL = "http://localhost:8080/"
 
-var dumbError = errors.New("dumb error")
+var errDumb = errors.New("dumb error")
 
 //nolint:funlen
 func TestURLShortenerHandler_HandlePostShortenPlain(t *testing.T) {
@@ -75,7 +75,7 @@ func TestURLShortenerHandler_HandlePostShortenPlain(t *testing.T) {
 			},
 			prepare: func(f *fields) {
 				gomock.InOrder(
-					f.repo.EXPECT().Store(gomock.Any(), gomock.Any(), gomock.Any()).Return("", dumbError),
+					f.repo.EXPECT().Store(gomock.Any(), gomock.Any(), gomock.Any()).Return("", errDumb),
 				)
 			},
 		},
@@ -201,7 +201,7 @@ func TestURLShortenerHandler_HandlePostShorten(t *testing.T) {
 			},
 			prepare: func(f *fields) {
 				gomock.InOrder(
-					f.repo.EXPECT().Store(gomock.Any(), gomock.Any(), gomock.Any()).Return("", dumbError),
+					f.repo.EXPECT().Store(gomock.Any(), gomock.Any(), gomock.Any()).Return("", errDumb),
 				)
 			},
 		},
@@ -312,7 +312,7 @@ func TestURLShortenerHandler_HandleGet(t *testing.T) {
 			},
 			prepare: func(f *fields) {
 				gomock.InOrder(
-					f.repo.EXPECT().Restore(gomock.Any(), gomock.Any()).Return("", dumbError),
+					f.repo.EXPECT().Restore(gomock.Any(), gomock.Any()).Return("", errDumb),
 				)
 			},
 		},
@@ -651,12 +651,12 @@ func TestURLShortener_HandlePostShortenBatch(t *testing.T) {
 `,
 			want: want{
 				status: http.StatusInternalServerError,
-				result: fmt.Sprintf("%s\n", dumbError.Error()),
+				result: fmt.Sprintf("%s\n", errDumb.Error()),
 			},
 			prepare: func(f *fields) {
 				gomock.InOrder(
 					f.repo.EXPECT().StoreBatch(gomock.Any(), gomock.Any(), gomock.Any()).
-						Return(map[string]string{}, dumbError),
+						Return(map[string]string{}, errDumb),
 				)
 			},
 		},
@@ -726,7 +726,7 @@ func TestURLShortener_HeartBeat(t *testing.T) {
 			want: want{status: http.StatusInternalServerError, result: "dumb error\n"},
 			prepare: func(f *fields) {
 				gomock.InOrder(
-					f.repo.EXPECT().Ping(gomock.Any()).Return(dumbError),
+					f.repo.EXPECT().Ping(gomock.Any()).Return(errDumb),
 				)
 			},
 		},
