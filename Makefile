@@ -33,11 +33,11 @@ gen:
 doc:
 	@godoc -http=:8081 & open http://localhost:8081/pkg/?m=all
 
-tests:
+tests: gen
 	@echo "  >  Running tests for $(GOBASE)/..."
 	@go test $(GOBASE)/...
 
-cover:
+cover: gen
 	@echo "  >  Running coverage for $(GOBASE)/..."
 	@go test -coverprofile cover.out $(GOBASE)/...
 	@go tool cover -html=cover.out
@@ -48,7 +48,7 @@ check:
 
 lint: lint-build
 	@echo "  >  Running $(LINT) for $(GOBASE)/..."
-	@$(GOBIN)/$(LINT) -help $(GOBASE)/...
+	@$(GOBIN)/$(LINT) $(GOBASE)/...
 
 lint-build:
 	@echo "  >  Building linters $(GOBASE)/$(LINT_PATH)"
@@ -77,7 +77,11 @@ go-run-db:
 	BASE_URL=$(BASE_URL) \
 	SERVER_ADDRESS=$(SERVER_ADDRESS) \
 	DATABASE_DSN=$(DATABASE_DSN) \
-	go run $(LDFLAGS) ./$(MAIN_PATH)
+	go run $(LDFLAGS) ./$(MAIN_PATH) -s
+
+go-run-cfg:
+	@GOBIN=$(GOBIN) \
+	go run $(LDFLAGS) ./$(MAIN_PATH) -c shortener.json
 
 build:
 	@docker build \
