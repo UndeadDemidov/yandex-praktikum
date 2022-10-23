@@ -177,6 +177,35 @@ func (s *Storage) StoreBatch(ctx context.Context, user string, batchIn map[strin
 	return batchOut, nil
 }
 
+func (s *Storage) Statistics(ctx context.Context) (urls int, users int) {
+	s.mx.Lock()
+	defer s.mx.Unlock()
+
+	m := map[string]interface{}{}
+	_, err := s.storageReader.file.Seek(0, io.SeekStart)
+	if err != nil {
+		panic("file storage in failed state")
+	}
+
+	scanner := bufio.NewScanner(s.storageReader.file)
+	for scanner.Scan() {
+		txt := scanner.Text()
+		alias := &Alias{}
+		dec := json.NewDecoder(bytes.NewBufferString(txt))
+		if err = dec.Decode(&alias); err != nil {
+			panic("file storage is corrupted")
+		}
+		urls++
+		m[alias.User] = nil
+	}
+
+	if err = scanner.Err(); err != nil {
+		panic("file storage is corrupted")
+	}
+
+	return urls, len(m)
+}
+
 // Ping проверяет, что файл хранения доступен и экземпляры инициализированы
 func (s *Storage) Ping(_ context.Context) error {
 	_, err := s.storageWriter.file.Stat()

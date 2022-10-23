@@ -274,6 +274,26 @@ func (s URLShortener) shortenBatch(ctx context.Context, user string, req []URLSh
 	return resp, err
 }
 
+func (s URLShortener) HandleStats(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
+	defer cancel()
+
+	// Странно линтер реагирует на использование переменной
+	urls, users := s.linkRepo.Statistics(ctx) //nolint:typecheck
+	stats := URLShortenStats{
+		URLs:  urls,
+		Users: users,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	err := json.NewEncoder(w).Encode(stats)
+	if err != nil {
+		utils.InternalServerError(w, err)
+		return
+	}
+}
+
 // HeartBeat - метод для проверки, что подключение к репозиторию живое.
 func (s URLShortener) HeartBeat(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 1*time.Second)
@@ -320,6 +340,11 @@ type Repository interface {
 	// batchOut= map[correlation_id]short_link
 	// если error == ErrLinkIsAlreadyShortened значит среди пакета были ранее сокращенные ссылки.
 	StoreBatch(ctx context.Context, user string, batchIn map[string]string) (batchOut map[string]string, err error)
+	// Statistics возвращает статистику сокращенных ссылок.
+	// Количество ссылок urls и количество пользователей users.
+	//
+	// Правильней, конечно, для расширяемости сделать структуру или мапу
+	Statistics(ctx context.Context) (urls int, users int)
 	// Ping проверяет готовность к работе репозитория.
 	Ping(context.Context) error
 	// Close завершает работу репозитория в стиле graceful shutdown.

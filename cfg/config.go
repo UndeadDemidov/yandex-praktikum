@@ -21,6 +21,7 @@ type Config struct {
 	FileStoragePath string `json:"file_storage_path"`
 	DatabaseDsn     string `json:"database_dsn"`
 	EnableHttps     bool   `json:"enable_https"`
+	TrustedSubnet   string `json:"trusted_subnet"`
 }
 
 func GetConfig() *Config {
@@ -30,6 +31,7 @@ func GetConfig() *Config {
 	pflag.StringP("file-storage-path", "f", "", "sets path for file storage")
 	pflag.StringP("database-dsn", "d", "", "sets connection string for postgres DB")
 	pflag.BoolP("enable-https", "s", false, "enable https protocol")
+	pflag.StringP("trusted-subnet", "t", "", "sets trusted subnet for incoming requests")
 	pflag.Parse()
 	err := viper.BindPFlags(pflag.CommandLine)
 	if err != nil {
@@ -57,7 +59,7 @@ func (c *Config) loadConfigFromFile(filepath string) {
 		log.Err(err).Msgf("can't open given config file: %s", filepath)
 		path, _ := os.Getwd()
 		log.Err(err).Msgf("current work path is %s", path)
-		return
+		panic(err)
 	}
 	defer func(file *os.File) {
 		err = file.Close()
@@ -69,6 +71,7 @@ func (c *Config) loadConfigFromFile(filepath string) {
 	err = json.NewDecoder(file).Decode(c)
 	if err != nil {
 		log.Err(err).Msgf("can't read config from given file: %s", filepath)
+		panic(err)
 	}
 }
 
@@ -87,5 +90,8 @@ func (c *Config) expandConfigFromFlags() {
 	}
 	if viper.GetBool("enable-https") {
 		c.EnableHttps = viper.GetBool("enable-https")
+	}
+	if viper.GetString("trusted-subnet") != "" {
+		c.DatabaseDsn = viper.GetString("trusted-subnet")
 	}
 }

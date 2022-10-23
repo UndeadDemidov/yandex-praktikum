@@ -761,3 +761,65 @@ func TestURLShortener_HeartBeat(t *testing.T) {
 		})
 	}
 }
+
+func TestURLShortener_HandleStats(t *testing.T) {
+	type fields struct {
+		repo *mock_handlers.MockRepository
+	}
+	type want struct {
+		status int
+		result string
+	}
+	tests := []struct {
+		name    string
+		want    want
+		prepare func(f *fields)
+	}{
+		{
+			name: "single test",
+			want: want{
+				status: http.StatusOK,
+				result: `
+{
+  "urls": 4,
+  "users": 4
+}
+`,
+			},
+			prepare: func(f *fields) {
+				gomock.InOrder(
+					f.repo.EXPECT().Statistics(gomock.Any()).Return(4, 4),
+				)
+			},
+		},
+	}
+	zerolog.SetGlobalLevel(zerolog.Disabled)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			mockRepo := mock_handlers.NewMockRepository(mockCtrl)
+
+			f := fields{
+				repo: mockRepo,
+			}
+			if tt.prepare != nil {
+				tt.prepare(&f)
+			}
+
+			request := httptest.NewRequest(http.MethodGet, "/", nil)
+			w := httptest.NewRecorder()
+			h := NewURLShortener(baseURL, mockRepo)
+			h.HandleStats(w, request)
+			result := w.Result()
+			assert.Equal(t, tt.want.status, result.StatusCode)
+
+			buf := new(bytes.Buffer)
+			_, err := buf.ReadFrom(result.Body)
+			require.NoError(t, err)
+			assert.JSONEq(t, tt.want.result, buf.String())
+			err = result.Body.Close()
+			require.NoError(t, err)
+		})
+	}
+}

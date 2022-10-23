@@ -37,7 +37,7 @@ func main() {
 // CreateServer создает сервер и возвращает его и репозиторий.
 // Можно заменить параметры на глобальные переменные, вроде как от этого ничего плохого не будет.
 func CreateServer() *http.Server {
-	return server.NewServer(config.BaseUrl, config.ServerAddress, repo)
+	return server.NewServer(config.BaseUrl, config.ServerAddress, config.TrustedSubnet, repo)
 }
 
 // Run запускает сервер с указанным репозиторием и реализуем graceful shutdown
