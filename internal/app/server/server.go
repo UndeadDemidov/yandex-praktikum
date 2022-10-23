@@ -41,6 +41,11 @@ func NewServer(baseURL string, addr string, repo handlers.Repository) *http.Serv
 		r.Get("/api/user/urls", handler.HandleGetUserURLsBucket)
 	})
 
+	// ToDo защитить trusted_subnet
+	r.Group(func(r chi.Router) {
+		r.Get("/api/internal/stats", handler.HandleStats)
+	})
+
 	r.Mount("/", http.DefaultServeMux)
 
 	s := &http.Server{

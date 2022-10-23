@@ -13,6 +13,7 @@ import (
 // Storage реализует хранение ссылок в памяти.
 // Является потоко безопасной реализацией Repository
 type Storage struct {
+	// storage map[<users>]map[<links>]string
 	storage map[string]map[string]string
 	mx      sync.Mutex
 }
@@ -113,6 +114,17 @@ func (s *Storage) StoreBatch(ctx context.Context, user string, batchIn map[strin
 	}
 
 	return batchOut, nil
+}
+
+func (s *Storage) Statistics(_ context.Context) (urls int, users int) {
+	s.mx.Lock()
+	defer s.mx.Unlock()
+
+	urls = len(s.storage)
+	for _, usr := range s.storage {
+		users += len(usr)
+	}
+	return
 }
 
 // Ping проверяет, что экземпляр Storage создан корректно, например с помощью NewStorage()

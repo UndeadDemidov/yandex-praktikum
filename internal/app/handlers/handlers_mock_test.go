@@ -43,6 +43,10 @@ func (rm RepoMock) StoreBatch(_ context.Context, _ string, _ map[string]string) 
 	return map[string]string{}, nil
 }
 
+func (rm RepoMock) Statistics(_ context.Context) (int, int) {
+	return 1, 1
+}
+
 func (rm RepoMock) Close() error {
 	return nil
 }
