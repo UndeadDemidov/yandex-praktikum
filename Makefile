@@ -54,36 +54,36 @@ lint-build:
 	@echo "  >  Building linters $(GOBASE)/$(LINT_PATH)"
 	@GOBIN=$(GOBIN) go build -o $(GOBIN)/$(LINT) $(GOBASE)/$(LINT_PATH)
 
-go-build:
+go-build: gen
 	@echo "  >  Building binary for $(GOBASE)/$(MAIN_PATH)"
 	@GOBIN=$(GOBIN) go build $(LDFLAGS) -o $(GOBIN)/$(MAIN) $(GOBASE)/$(MAIN_PATH)
 
 # -ldflags "-X main.Version=v1.0.1 -X 'main.BuildTime=$(date +'%Y/%m/%d %H:%M:%S')'"
-go-run-mem:
+go-run-mem: gen
 	@GOBIN=$(GOBIN) \
 	BASE_URL=$(BASE_URL) \
 	SERVER_ADDRESS=$(SERVER_ADDRESS) \
 	go run $(LDFLAGS) ./$(MAIN_PATH)
 
-go-run-file:
+go-run-file: gen
 	@GOBIN=$(GOBIN) \
 	BASE_URL=$(BASE_URL) \
 	SERVER_ADDRESS=$(SERVER_ADDRESS) \
 	FILE_STORAGE_PATH=$(FILE_STORAGE_PATH) \
 	go run $(LDFLAGS) ./$(MAIN_PATH)
 
-go-run-db:
+go-run-db: gen
 	@GOBIN=$(GOBIN) \
 	BASE_URL=$(BASE_URL) \
 	SERVER_ADDRESS=$(SERVER_ADDRESS) \
 	DATABASE_DSN=$(DATABASE_DSN) \
 	go run $(LDFLAGS) ./$(MAIN_PATH) -s
 
-go-run-cfg:
+go-run-cfg: gen
 	@GOBIN=$(GOBIN) \
 	go run $(LDFLAGS) ./$(MAIN_PATH) -c shortener.json
 
-build:
+build: gen
 	@docker build \
 	--build-arg APP=$(PROJECT) \
 	--build-arg MAIN_PATH=$(MAIN_PATH) \
