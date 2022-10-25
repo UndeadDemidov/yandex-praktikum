@@ -12,13 +12,16 @@ import (
 	"strings"
 	"testing"
 
-	mock_handlers "github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers/mocks"
+	mock "github.com/UndeadDemidov/yandex-praktikum/internal/app/handlers/mocks"
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
+	pb "github.com/UndeadDemidov/yandex-praktikum/proto"
 	"github.com/go-chi/chi/v5"
 	"github.com/golang/mock/gomock"
 	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 const baseURL = "http://localhost:8080/"
@@ -28,7 +31,7 @@ var errDumb = errors.New("dumb error")
 //nolint:funlen
 func TestURLShortenerHandler_HandlePostShortenPlain(t *testing.T) {
 	type fields struct {
-		repo *mock_handlers.MockRepository
+		repo *mock.MockRepository
 	}
 	type want struct {
 		status        int
@@ -101,7 +104,7 @@ func TestURLShortenerHandler_HandlePostShortenPlain(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
-			mockRepo := mock_handlers.NewMockRepository(mockCtrl)
+			mockRepo := mock.NewMockRepository(mockCtrl)
 
 			f := fields{
 				repo: mockRepo,
@@ -154,7 +157,7 @@ func ExampleURLShortener_HandlePostShortenPlain() {
 //nolint:funlen
 func TestURLShortenerHandler_HandlePostShorten(t *testing.T) {
 	type fields struct {
-		repo *mock_handlers.MockRepository
+		repo *mock.MockRepository
 	}
 	type want struct {
 		wantErr assert.ErrorAssertionFunc
@@ -235,7 +238,7 @@ func TestURLShortenerHandler_HandlePostShorten(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
-			mockRepo := mock_handlers.NewMockRepository(mockCtrl)
+			mockRepo := mock.NewMockRepository(mockCtrl)
 
 			f := fields{
 				repo: mockRepo,
@@ -265,7 +268,7 @@ func TestURLShortenerHandler_HandlePostShorten(t *testing.T) {
 
 func TestURLShortenerHandler_HandleGet(t *testing.T) {
 	type fields struct {
-		repo *mock_handlers.MockRepository
+		repo *mock.MockRepository
 	}
 	type want struct {
 		location string
@@ -322,7 +325,7 @@ func TestURLShortenerHandler_HandleGet(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
-			mockRepo := mock_handlers.NewMockRepository(mockCtrl)
+			mockRepo := mock.NewMockRepository(mockCtrl)
 
 			f := fields{
 				repo: mockRepo,
@@ -351,7 +354,7 @@ func TestURLShortenerHandler_HandleGet(t *testing.T) {
 
 func TestURLShortener_HandleDelete(t *testing.T) {
 	type fields struct {
-		repo *mock_handlers.MockRepository
+		repo *mock.MockRepository
 	}
 	type want struct {
 		status int
@@ -387,7 +390,7 @@ func TestURLShortener_HandleDelete(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
-			mockRepo := mock_handlers.NewMockRepository(mockCtrl)
+			mockRepo := mock.NewMockRepository(mockCtrl)
 
 			f := fields{
 				repo: mockRepo,
@@ -427,7 +430,7 @@ func ExampleURLShortener_HandleDelete() {
 //nolint:funlen
 func TestURLShortener_HandleGetUserURLsBucket(t *testing.T) {
 	type fields struct {
-		repo *mock_handlers.MockRepository
+		repo *mock.MockRepository
 	}
 	type want struct {
 		status int
@@ -497,7 +500,7 @@ func TestURLShortener_HandleGetUserURLsBucket(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
-			mockRepo := mock_handlers.NewMockRepository(mockCtrl)
+			mockRepo := mock.NewMockRepository(mockCtrl)
 
 			f := fields{
 				repo: mockRepo,
@@ -529,7 +532,7 @@ func TestURLShortener_HandleGetUserURLsBucket(t *testing.T) {
 
 func TestURLShortener_HandlePostShortenBatch(t *testing.T) {
 	type fields struct {
-		repo *mock_handlers.MockRepository
+		repo *mock.MockRepository
 	}
 	type want struct {
 		status int
@@ -666,7 +669,7 @@ func TestURLShortener_HandlePostShortenBatch(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
-			mockRepo := mock_handlers.NewMockRepository(mockCtrl)
+			mockRepo := mock.NewMockRepository(mockCtrl)
 
 			f := fields{
 				repo: mockRepo,
@@ -701,7 +704,7 @@ func TestURLShortener_HandlePostShortenBatch(t *testing.T) {
 
 func TestURLShortener_HeartBeat(t *testing.T) {
 	type fields struct {
-		repo *mock_handlers.MockRepository
+		repo *mock.MockRepository
 	}
 	type want struct {
 		status int
@@ -736,7 +739,7 @@ func TestURLShortener_HeartBeat(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
-			mockRepo := mock_handlers.NewMockRepository(mockCtrl)
+			mockRepo := mock.NewMockRepository(mockCtrl)
 
 			f := fields{
 				repo: mockRepo,
@@ -764,7 +767,7 @@ func TestURLShortener_HeartBeat(t *testing.T) {
 
 func TestURLShortener_HandleStats(t *testing.T) {
 	type fields struct {
-		repo *mock_handlers.MockRepository
+		repo *mock.MockRepository
 	}
 	type want struct {
 		status int
@@ -798,7 +801,7 @@ func TestURLShortener_HandleStats(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
-			mockRepo := mock_handlers.NewMockRepository(mockCtrl)
+			mockRepo := mock.NewMockRepository(mockCtrl)
 
 			f := fields{
 				repo: mockRepo,
@@ -820,6 +823,87 @@ func TestURLShortener_HandleStats(t *testing.T) {
 			assert.JSONEq(t, tt.want.result, buf.String())
 			err = result.Body.Close()
 			require.NoError(t, err)
+		})
+	}
+}
+
+func TestURLShortener_Short(t *testing.T) {
+	type fields struct {
+		repo *mock.MockRepository
+	}
+	type args struct {
+		request *pb.ShortRequest
+	}
+	tests := []struct {
+		name     string
+		args     args
+		prepare  func(f *fields)
+		want     *pb.ShortResponse
+		wantErr  assert.ErrorAssertionFunc
+		wantCode codes.Code
+	}{
+		{
+			name: "simple request",
+			args: args{
+				request: &pb.ShortRequest{
+					UserId: "test",
+					Url:    "https://ya.ru",
+				},
+			},
+			prepare: func(f *fields) {
+				gomock.InOrder(
+					f.repo.EXPECT().Store(gomock.Any(), gomock.Any(), gomock.Any()).Return("1111", nil),
+				)
+			},
+			want: &pb.ShortResponse{
+				Result: fmt.Sprintf("%s%s", baseURL, "1111"),
+			},
+			wantErr: assert.NoError,
+		},
+		{
+			name: "already shortened",
+			args: args{
+				request: &pb.ShortRequest{
+					UserId: "test",
+					Url:    "https://ya.ru",
+				},
+			},
+			prepare: func(f *fields) {
+				gomock.InOrder(
+					f.repo.EXPECT().Store(gomock.Any(), gomock.Any(), gomock.Any()).Return("1111", ErrLinkIsAlreadyShortened),
+				)
+			},
+			want:     nil,
+			wantErr:  assert.Error,
+			wantCode: codes.AlreadyExists,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			mockRepo := mock.NewMockRepository(mockCtrl)
+
+			f := fields{
+				repo: mockRepo,
+			}
+			if tt.prepare != nil {
+				tt.prepare(&f)
+			}
+
+			h := NewURLShortener(baseURL, mockRepo)
+			got, err := h.Short(context.Background(), tt.args.request)
+			if !tt.wantErr(t, err, fmt.Sprintf("Short(_, %v)", tt.args.request)) {
+				return
+			}
+
+			if err != nil {
+				if e, ok := status.FromError(err); ok {
+					assert.Equal(t, tt.wantCode, e.Code())
+				}
+			}
+
+			assert.Equalf(t, tt.want, got, "Short(_, %v)", tt.args.request)
 		})
 	}
 }

@@ -16,7 +16,7 @@ message ShortResponse {
 }
 
 message ExpandRequest {
-  string short_url = 1;
+  string short_id = 1;
 }
 
 message ExpandResponse {
@@ -32,19 +32,32 @@ message GetUserBucketRequest {
   string user_id = 1;
 }
 
-message GetUserBucketResponse {
+message Pair {
   string short_url = 1;
   string original_url = 2;
 }
 
-message ShortBatchRequest {
+message GetUserBucketResponse {
+  repeated Pair pair = 1;
+}
+
+message CorrelatedOriginalURL {
   string correlation_id = 1;
   string original_url = 2;
 }
 
-message ShortBatchResponse {
+message ShortBatchRequest {
+  string user_id = 1;
+  repeated CorrelatedOriginalURL original = 2;
+}
+
+message CorrelatedShortURL {
   string correlation_id = 1;
   string short_url = 2;
+}
+
+message ShortBatchResponse {
+  repeated CorrelatedShortURL short = 1;
 }
 
 message StatsResponse {
