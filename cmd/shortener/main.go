@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -15,6 +16,7 @@ import (
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
 	_ "github.com/lib/pq"
 	"github.com/rs/zerolog/log"
+	"google.golang.org/grpc"
 )
 
 var (
@@ -31,21 +33,28 @@ func main() {
 	fmt.Printf("Build commit: %s\n", buildCommit)
 
 	srv := CreateServer()
-	Run(srv)
+	g := CreateGRPCServer()
+	Run(srv, g)
 }
 
 // CreateServer создает сервер и возвращает его и репозиторий.
 // Можно заменить параметры на глобальные переменные, вроде как от этого ничего плохого не будет.
 func CreateServer() *http.Server {
-	return server.NewServer(config.BaseUrl, config.ServerAddress, repo)
+	return server.NewServer(config.BaseUrl, config.ServerAddress, config.TrustedSubnet, repo)
+}
+
+// CreateGRPCServer создает grpc сервер и возвращает его и репозиторий.
+func CreateGRPCServer() *grpc.Server {
+	return server.NewGRPCServer(config.BaseUrl, repo)
 }
 
 // Run запускает сервер с указанным репозиторием и реализуем graceful shutdown
 // Более читаемый вариант: https://github.com/rudderlabs/graceful-shutdown-examples/blob/main/httpserver/main.go
-func Run(srv *http.Server) {
+func Run(srv *http.Server, grpc *grpc.Server) {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGINT, syscall.SIGTERM, syscall.SIGQUIT)
 	defer stop()
 
+	log.Info().Msg("Start HTTP server...")
 	go func() {
 		const (
 			cert = "cert.pem"
@@ -66,12 +75,22 @@ func Run(srv *http.Server) {
 		if err != nil && err != http.ErrServerClosed {
 			log.Fatal().Msgf("listen: %+v\n", err)
 		}
-		log.Info().Msg("Server started")
+	}()
+
+	log.Info().Msg("Start GRPC server...")
+	go func() {
+		listen, err := net.Listen("tcp", ":3200")
+		if err != nil {
+			log.Fatal().Msgf("listen: %+v\n", err)
+		}
+		if err = grpc.Serve(listen); err != nil {
+			log.Fatal().Msgf("serve: %+v\n", err)
+		}
 	}()
 
 	<-ctx.Done()
 
-	log.Info().Msg("Server stopped")
+	log.Info().Msg("Servers stopping...")
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer func() {
 		err := repo.Close()
@@ -85,6 +104,7 @@ func Run(srv *http.Server) {
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Error().Msgf("Server Shutdown Failed:%+v", err)
 	}
+	grpc.GracefulStop()
 	stop()
-	log.Info().Msg("Server exited properly")
+	log.Info().Msg("Servers exited properly")
 }

@@ -1,0 +1,75 @@
+syntax = "proto3";
+
+import "google/protobuf/empty.proto";
+
+package shortener;
+
+option go_package = "yandex-praktikum/proto";
+
+message ShortRequest {
+  string user_id = 1;
+  string url = 2;
+}
+
+message ShortResponse {
+  string result = 1;
+}
+
+message ExpandRequest {
+  string short_id = 1;
+}
+
+message ExpandResponse {
+  string url = 1;
+}
+
+message DeleteRequest {
+  string user_id = 1;
+  repeated string id = 2;
+}
+
+message GetUserBucketRequest {
+  string user_id = 1;
+}
+
+message Pair {
+  string short_url = 1;
+  string original_url = 2;
+}
+
+message GetUserBucketResponse {
+  repeated Pair pair = 1;
+}
+
+message CorrelatedOriginalURL {
+  string correlation_id = 1;
+  string original_url = 2;
+}
+
+message ShortBatchRequest {
+  string user_id = 1;
+  repeated CorrelatedOriginalURL original = 2;
+}
+
+message CorrelatedShortURL {
+  string correlation_id = 1;
+  string short_url = 2;
+}
+
+message ShortBatchResponse {
+  repeated CorrelatedShortURL short = 1;
+}
+
+message StatsResponse {
+  int64 urls = 1;
+  int64 users = 2;
+}
+
+service Shortener {
+  rpc Short(ShortRequest) returns (ShortResponse);
+  rpc Expand(ExpandRequest) returns (ExpandResponse);
+  rpc Delete(DeleteRequest) returns (google.protobuf.Empty);
+  rpc GetUserBucket(GetUserBucketRequest) returns (GetUserBucketResponse);
+  rpc ShortBatch(ShortBatchRequest) returns (ShortBatchResponse);
+  rpc Stats(google.protobuf.Empty) returns (StatsResponse);
+}

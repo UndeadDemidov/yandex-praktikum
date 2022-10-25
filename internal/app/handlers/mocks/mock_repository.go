@@ -91,6 +91,21 @@ func (mr *MockRepositoryMockRecorder) Restore(arg0, arg1 interface{}) *gomock.Ca
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Restore", reflect.TypeOf((*MockRepository)(nil).Restore), arg0, arg1)
 }
 
+// Statistics mocks base method.
+func (m *MockRepository) Statistics(arg0 context.Context) (int, int) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Statistics", arg0)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(int)
+	return ret0, ret1
+}
+
+// Statistics indicates an expected call of Statistics.
+func (mr *MockRepositoryMockRecorder) Statistics(arg0 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Statistics", reflect.TypeOf((*MockRepository)(nil).Statistics), arg0)
+}
+
 // Store mocks base method.
 func (m *MockRepository) Store(arg0 context.Context, arg1, arg2 string) (string, error) {
 	m.ctrl.T.Helper()

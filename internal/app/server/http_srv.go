@@ -1,6 +1,7 @@
 package server
 
 import (
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 
@@ -13,7 +14,7 @@ import (
 )
 
 // NewServer создает и возвращает новый сервер с указанным репозиторием коротких ссылок
-func NewServer(baseURL string, addr string, repo handlers.Repository) *http.Server {
+func NewServer(baseURL string, addr string, trusted string, repo handlers.Repository) *http.Server {
 	linkStore := repo
 	handler := handlers.NewURLShortener(baseURL, linkStore)
 
@@ -40,6 +41,18 @@ func NewServer(baseURL string, addr string, repo handlers.Repository) *http.Serv
 		r.Post("/api/shorten/batch", handler.HandlePostShortenBatch)
 		r.Get("/api/user/urls", handler.HandleGetUserURLsBucket)
 	})
+
+	if trusted != "" {
+		_, trustedNet, err := net.ParseCIDR(trusted)
+		if err != nil {
+			panic("trusted subnet value is not valid")
+		}
+
+		r.Group(func(r chi.Router) {
+			r.Use(midware.IPFilter(trustedNet))
+			r.Get("/api/internal/stats", handler.HandleStats)
+		})
+	}
 
 	r.Mount("/", http.DefaultServeMux)
 

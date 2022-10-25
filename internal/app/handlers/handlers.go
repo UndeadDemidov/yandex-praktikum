@@ -12,9 +12,13 @@ import (
 
 	midware "github.com/UndeadDemidov/yandex-praktikum/internal/app/middleware"
 	"github.com/UndeadDemidov/yandex-praktikum/internal/app/utils"
+	pb "github.com/UndeadDemidov/yandex-praktikum/proto"
 	"github.com/go-chi/chi/v5"
 	_ "github.com/golang/mock/mockgen/model"
 	"github.com/rs/zerolog/log"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 //go:generate mockgen -destination=./mocks/mock_repository.go . Repository
@@ -27,12 +31,44 @@ var (
 	ErrProperJSONIsExpected   = errors.New("proper JSON is expected, read task description carefully")
 )
 
+// Repository описывает контракт работы с хранилищем.
+// Используется для удобства тестирования и для дальнейшей легкой миграции на другой "движок".
+type Repository interface {
+	// Store сохраняет оригинальную ссылку и возвращает id (токен) сокращенного варианта.
+	Store(ctx context.Context, user string, link string) (id string, err error)
+	// Restore возвращает оригинальную ссылку по его id.
+	// если error == ErrLinkIsDeleted значит короткая ссылка (id) была удалена.
+	Restore(ctx context.Context, id string) (link string, err error)
+	// Unstore - помечает ссылки удаленными.
+	// Согласно заданию - результат работы пользователю не возвращается.
+	Unstore(ctx context.Context, user string, ids []string)
+	// GetUserStorage возвращает массив всех ранее сокращенных пользователей ссылок.
+	GetUserStorage(ctx context.Context, user string) map[string]string
+	// StoreBatch сохраняет пакет ссылок в хранилище и возвращает список пакет id.
+	// batchIn = map[correlation_id]original_link
+	// batchOut= map[correlation_id]short_link
+	// если error == ErrLinkIsAlreadyShortened значит среди пакета были ранее сокращенные ссылки.
+	StoreBatch(ctx context.Context, user string, batchIn map[string]string) (batchOut map[string]string, err error)
+	// Statistics возвращает статистику сокращенных ссылок.
+	// Количество ссылок urls и количество пользователей users.
+	//
+	// Правильней, конечно, для расширяемости сделать структуру или мапу
+	Statistics(ctx context.Context) (urls int, users int)
+	// Ping проверяет готовность к работе репозитория.
+	Ping(context.Context) error
+	// Close завершает работу репозитория в стиле graceful shutdown.
+	Close() error
+}
+
 // URLShortener - реализует набор методов для сокращения ссылок, хранение их оригинального состояние
 // и открытие по сокращенному варианту. Обеспечивается контроль авторства сокращенных ссылок.
 type URLShortener struct {
 	linkRepo Repository
 	baseURL  string
+	pb.UnimplementedShortenerServer
 }
+
+var _ pb.ShortenerServer = (*URLShortener)(nil)
 
 // NewURLShortener создает URLShortener и инициализирует его адресом, по которому будут доступны методы,
 // и репозиторием хранения ссылок.
@@ -274,6 +310,26 @@ func (s URLShortener) shortenBatch(ctx context.Context, user string, req []URLSh
 	return resp, err
 }
 
+func (s URLShortener) HandleStats(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), 4*time.Second)
+	defer cancel()
+
+	// Странно линтер реагирует на использование переменной
+	urls, users := s.linkRepo.Statistics(ctx) //nolint:typecheck
+	stats := URLShortenStats{
+		URLs:  urls,
+		Users: users,
+	}
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+
+	err := json.NewEncoder(w).Encode(stats)
+	if err != nil {
+		utils.InternalServerError(w, err)
+		return
+	}
+}
+
 // HeartBeat - метод для проверки, что подключение к репозиторию живое.
 func (s URLShortener) HeartBeat(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 1*time.Second)
@@ -302,26 +358,89 @@ func (s URLShortener) HandleNotFound(w http.ResponseWriter, _ *http.Request) {
 	http.Error(w, ErrMethodNotAllowed.Error(), http.StatusNotFound)
 }
 
-// Repository описывает контракт работы с хранилищем.
-// Используется для удобства тестирования и для дальнейшей легкой миграции на другой "движок".
-type Repository interface {
-	// Store сохраняет оригинальную ссылку и возвращает id (токен) сокращенного варианта.
-	Store(ctx context.Context, user string, link string) (id string, err error)
-	// Restore возвращает оригинальную ссылку по его id.
-	// если error == ErrLinkIsDeleted значит короткая ссылка (id) была удалена.
-	Restore(ctx context.Context, id string) (link string, err error)
-	// Unstore - помечает ссылки удаленными.
-	// Согласно заданию - результат работы пользователю не возвращается.
-	Unstore(ctx context.Context, user string, ids []string)
-	// GetUserStorage возвращает массив всех ранее сокращенных пользователей ссылок.
-	GetUserStorage(ctx context.Context, user string) map[string]string
-	// StoreBatch сохраняет пакет ссылок в хранилище и возвращает список пакет id.
-	// batchIn = map[correlation_id]original_link
-	// batchOut= map[correlation_id]short_link
-	// если error == ErrLinkIsAlreadyShortened значит среди пакета были ранее сокращенные ссылки.
-	StoreBatch(ctx context.Context, user string, batchIn map[string]string) (batchOut map[string]string, err error)
-	// Ping проверяет готовность к работе репозитория.
-	Ping(context.Context) error
-	// Close завершает работу репозитория в стиле graceful shutdown.
-	Close() error
+// gRPC implementation part
+// Да, нужно было выделить слой Service, тогда было бы 2 фасада: rest и grpc.
+// Вот пример архитектуры, где все было бы норм https://github.com/UndeadDemidov/ya-pr-diploma
+// Так и не нашел времени сделать рефакторинг в учебном проекте, а сейчас уже не успеваю.
+// И кстати, в теории нет описания, подпихуть Cookie в grpc. Нагуглил, как это можно сделать.
+// https://github.com/youngderekm/grpc-cookies-example
+
+func (s URLShortener) Short(ctx context.Context, request *pb.ShortRequest) (*pb.ShortResponse, error) {
+	var resp pb.ShortResponse
+	shortened, err := s.shorten(ctx, request.UserId, request.Url)
+
+	switch {
+	case errors.Is(err, ErrLinkIsAlreadyShortened):
+		return nil, status.Error(codes.AlreadyExists, "link is already shortened")
+	case err != nil:
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+	resp.Result = shortened
+	return &resp, nil
+}
+
+func (s URLShortener) Expand(ctx context.Context, request *pb.ExpandRequest) (*pb.ExpandResponse, error) {
+	var resp pb.ExpandResponse
+	url, err := s.linkRepo.Restore(ctx, request.ShortId)
+	if err != nil {
+		return nil, err
+	}
+	resp.Url = url
+	return &resp, nil
+}
+
+func (s URLShortener) Delete(ctx context.Context, request *pb.DeleteRequest) (*emptypb.Empty, error) {
+	req := make([]URLID, 0, len(request.Id))
+	for _, id := range request.Id {
+		req = append(req, URLID(id))
+	}
+	s.unstore(ctx, request.UserId, req)
+	return &emptypb.Empty{}, nil
+}
+
+func (s URLShortener) GetUserBucket(ctx context.Context, request *pb.GetUserBucketRequest) (*pb.GetUserBucketResponse, error) {
+	var resp pb.GetUserBucketResponse
+	urlsMap := s.linkRepo.GetUserStorage(ctx, request.UserId)
+
+	resp.Pair = make([]*pb.Pair, 0, len(urlsMap))
+	for k, v := range urlsMap {
+		resp.Pair = append(resp.Pair, &pb.Pair{
+			ShortUrl:    k,
+			OriginalUrl: fmt.Sprintf("%s%s", s.baseURL, v),
+		})
+	}
+	return &resp, nil
+}
+
+func (s URLShortener) ShortBatch(ctx context.Context, request *pb.ShortBatchRequest) (*pb.ShortBatchResponse, error) {
+	var resp pb.ShortBatchResponse
+
+	req := make([]URLShortenCorrelatedRequest, 0, len(request.Original))
+	for _, url := range request.Original {
+		req = append(req, URLShortenCorrelatedRequest{
+			CorrelationID: url.CorrelationId,
+			OriginalURL:   url.OriginalUrl,
+		})
+	}
+	r, err := s.shortenBatch(ctx, request.UserId, req)
+	if err != nil {
+		return nil, err
+	}
+
+	resp.Short = make([]*pb.CorrelatedShortURL, 0, len(r))
+	for _, url := range r {
+		resp.Short = append(resp.Short, &pb.CorrelatedShortURL{
+			CorrelationId: url.CorrelationID,
+			ShortUrl:      url.ShortURL,
+		})
+	}
+	return &resp, nil
+}
+
+func (s URLShortener) Stats(ctx context.Context, _ *emptypb.Empty) (*pb.StatsResponse, error) {
+	var resp pb.StatsResponse
+	urls, users := s.linkRepo.Statistics(ctx)
+	resp.Urls = int64(urls)
+	resp.Users = int64(users)
+	return &resp, nil
 }

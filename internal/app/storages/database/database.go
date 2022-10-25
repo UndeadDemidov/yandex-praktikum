@@ -45,6 +45,7 @@ const (
 	restoreQuery    = `SELECT original_url, is_deleted FROM shortened_urls WHERE id=$1`
 	deleteStatement = `UPDATE shortened_urls SET is_deleted=TRUE WHERE user_id=$1 AND id=$2`
 	userBucketQuery = `SELECT id, original_url FROM shortened_urls WHERE user_id=$1`
+	statsQuery      = `SELECT COUNT(1), COUNT(DISTINCT user_id) FROM shortened_urls`
 
 	batchSize = 10
 )
@@ -358,6 +359,18 @@ func (s *Storage) StoreBatch(ctx context.Context, user string, batchIn map[strin
 	}
 	log.Debug().Msg("batch is processed properly")
 	return batchOut, err // err либо nil, либо ErrLinkIsAlreadyShortened
+}
+
+func (s *Storage) Statistics(ctx context.Context) (urls int, users int) {
+	err := s.database.QueryRowContext(ctx, statsQuery).Scan(&urls, &users)
+	switch {
+	case errors.Is(err, sql.ErrNoRows):
+		return 0, 0
+	case err != nil:
+		panic("database is corrupted")
+	}
+
+	return
 }
 
 // Ping проверяет доступность БД

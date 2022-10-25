@@ -32,7 +32,7 @@ func MapToBucket(baseURL string, m map[string]string) *[]BucketItem {
 	return &bucket
 }
 
-// URLShortenCorrelatedResponse представляет собой структуру, в которой требуется сериализовать список ссылок
+// URLShortenCorrelatedResponse представляет собой структуру, в которой требуется сериализовать список ссылок.
 //
 //	[
 //	  {
@@ -43,4 +43,10 @@ func MapToBucket(baseURL string, m map[string]string) *[]BucketItem {
 type URLShortenCorrelatedResponse struct {
 	CorrelationID string `json:"correlation_id"`
 	ShortURL      string `json:"short_url"`
+}
+
+// URLShortenStats представляет структуру ответа на запрос о статистике сервиса.
+type URLShortenStats struct {
+	URLs  int `json:"urls"`
+	Users int `json:"users"`
 }

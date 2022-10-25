@@ -198,3 +198,35 @@ func TestStorage_GetUserStorage(t *testing.T) {
 		})
 	}
 }
+
+func TestStorage_Statistics(t *testing.T) {
+	tests := []struct {
+		name      string
+		wantUrls  int
+		wantUsers int
+	}{
+		{
+			name:      "single test",
+			wantUrls:  4,
+			wantUsers: 1,
+		},
+	}
+
+	filename := "file_storage.json"
+	fs, err := NewStorage(filename)
+	require.NoError(t, err)
+	defer func(fs *Storage) {
+		err := fs.Close()
+		if err != nil {
+			log.Fatalln(err)
+		}
+	}(fs)
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			gotUrls, gotUsers := fs.Statistics(context.Background())
+			assert.Equalf(t, tt.wantUrls, gotUrls, "Statistics(_)")
+			assert.Equalf(t, tt.wantUsers, gotUsers, "Statistics(_)")
+		})
+	}
+}

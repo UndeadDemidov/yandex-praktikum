@@ -209,3 +209,55 @@ func TestStorage_GetUserStorage(t *testing.T) {
 		})
 	}
 }
+
+func TestStorage_Statistics(t *testing.T) {
+	type fields struct {
+		storage map[string]map[string]string
+	}
+	type want struct {
+		urls, users int
+	}
+	tests := []struct {
+		want   want
+		fields fields
+		name   string
+	}{
+		{
+			name:   "empty storage",
+			fields: fields{storage: map[string]map[string]string{}},
+			want: want{
+				urls:  0,
+				users: 0,
+			},
+		},
+		{
+			name: "not empty storage",
+			fields: fields{storage: map[string]map[string]string{
+				"xxxx": {
+					"1111": "https://ya.ru",
+					"2222": "https://yandex.ru",
+					"3333": "https://practicum.yandex.ru/",
+				},
+				"yyyy": {
+					"4444": "https://go.dev",
+					"5555": "https://go.dev/dl/",
+					"6666": "https://go.dev/doc/",
+				},
+			}},
+			want: want{
+				urls:  2,
+				users: 6,
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Storage{
+				storage: tt.fields.storage,
+			}
+			gotUrls, gotUsers := s.Statistics(context.Background())
+			assert.Equalf(t, tt.want.urls, gotUrls, "Statistics(_)")
+			assert.Equalf(t, tt.want.users, gotUsers, "Statistics(_)")
+		})
+	}
+}
